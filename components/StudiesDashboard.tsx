@@ -22,22 +22,41 @@ interface FlowRow {
 interface ProcessedChat {
   conversationId: string;
   contractId: string;
+  clientId: string;
   clientName: string;
   chatStartDateTime: string;
   phrases: string[];
   mergedChat: string;
+  isMvServiceClient: boolean;
 }
 
 export default function StudiesDashboard() {
   const [data, setData] = useState<FlowRow[]>([]);
+  const [mvServiceClientIds, setMvServiceClientIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadCSV = async () => {
+    const loadData = async () => {
       try {
         setIsLoading(true);
         setError(null);
+        
+        // Fetch MV Service client IDs
+        try {
+          const mvResponse = await fetch('/api/studies/mv-service-clients');
+          if (mvResponse.ok) {
+            const mvData = await mvResponse.json();
+            if (mvData.success && mvData.clientIds) {
+              setMvServiceClientIds(new Set(mvData.clientIds.map((id: string) => String(id))));
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to load MV Service clients, using fallback:', err);
+          // Use fallback IDs
+          const fallbackIds = ['161098', '163125', '175281', '227085', '231246', '235838', '283486', '298205', '299868', '350028', '414198', '441393', '443648', '447522'];
+          setMvServiceClientIds(new Set(fallbackIds));
+        }
         
         // Fetch the CSV file
         const response = await fetch('/api/studies/flow-csv');
@@ -66,7 +85,7 @@ export default function StudiesDashboard() {
       }
     };
 
-    loadCSV();
+    loadData();
   }, []);
 
   // Filter for is_pro_services_related = TRUE
@@ -93,13 +112,18 @@ export default function StudiesDashboard() {
         .map((phrase, index) => `${index + 1}. ${phrase}`)
         .join('\n\n');
 
+      const clientId = row.clientId?.trim() || '';
+      const isMvServiceClient = mvServiceClientIds.has(clientId);
+
       return {
         conversationId: row.conversationId || 'N/A',
         contractId: row.contractId || 'N/A',
+        clientId,
         clientName: row.clientName || 'N/A',
         chatStartDateTime: row.chatStartDateTime || 'N/A',
         phrases,
         mergedChat,
+        isMvServiceClient,
       };
     });
   };
@@ -191,17 +215,34 @@ export default function StudiesDashboard() {
             {processedChats.map((chat, index) => (
               <div
                 key={`${chat.conversationId}-${index}`}
-                className="bg-white rounded-lg border border-slate-200 p-5 hover:shadow-md transition-shadow"
+                className={`rounded-lg border p-5 hover:shadow-md transition-shadow ${
+                  chat.isMvServiceClient
+                    ? 'bg-green-50 border-green-300 ring-2 ring-green-200'
+                    : 'bg-white border-slate-200'
+                }`}
               >
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      {chat.isMvServiceClient && (
+                        <span className="text-xs font-semibold text-white bg-green-600 px-2 py-1 rounded-full flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          MV Service Client
+                        </span>
+                      )}
                       <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded">
                         Contract ID: {chat.contractId}
                       </span>
                       <span className="text-xs font-semibold text-slate-600 bg-slate-50 px-2 py-1 rounded">
                         Chat ID: {chat.conversationId}
                       </span>
+                      {chat.clientId && (
+                        <span className="text-xs font-semibold text-purple-600 bg-purple-50 px-2 py-1 rounded">
+                          Client ID: {chat.clientId}
+                        </span>
+                      )}
                     </div>
                     {chat.clientName !== 'N/A' && (
                       <p className="text-sm font-medium text-slate-700">{chat.clientName}</p>
