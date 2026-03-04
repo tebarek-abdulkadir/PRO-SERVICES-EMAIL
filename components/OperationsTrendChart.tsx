@@ -277,9 +277,9 @@ export default function OperationsTrendChart({ data, isLoading }: OperationsTren
               boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
             }}
             labelStyle={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '13px' }}
-            formatter={(value: number | undefined, name: string) => {
-              if (value === undefined || value === null) return ['0', name];
-              return [value.toLocaleString(), name];
+            formatter={(value: number | undefined, name: string | undefined) => {
+              if (value === undefined || value === null) return ['0', name || ''];
+              return [value.toLocaleString(), name || ''];
             }}
             labelFormatter={(label) => `Date: ${label}`}
           />
