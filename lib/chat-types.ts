@@ -15,6 +15,9 @@ export interface ChatTrendData {
   date: string;
   frustrationPercentage: number; // Percentage of frustrated conversations
   confusionPercentage: number; // Percentage of confused conversations
+  frustratedCount: number; // Total count of frustrated people
+  confusedCount: number; // Total count of confused people
+  totalPeople: number; // Total unique people
 }
 
 export interface ChatDriver {

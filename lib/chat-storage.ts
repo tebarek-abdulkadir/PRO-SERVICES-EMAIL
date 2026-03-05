@@ -118,11 +118,24 @@ export async function getDailyChatAnalysisData(date: string): Promise<ChatAnalys
 /**
  * Get historical trend data for the dashboard (last 30 days)
  */
-export async function getChatTrendData(endDate: string, days: number = 30): Promise<ChatTrendData[]> {
+export async function getChatTrendData(endDate: string, days?: number): Promise<ChatTrendData[]> {
   const trendData: ChatTrendData[] = [];
   const end = new Date(endDate);
   
-  for (let i = days - 1; i >= 0; i--) {
+  // Calculate start date: 1st of current month (max)
+  const firstOfMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+  const startDate = firstOfMonth;
+  
+  // Calculate actual days to fetch (inclusive of both start and end dates)
+  const diffMs = end.getTime() - startDate.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const daysFromFirstOfMonth = diffDays + 1; // +1 to include both start and end dates
+  
+  const actualDays = days 
+    ? Math.min(days, daysFromFirstOfMonth)
+    : daysFromFirstOfMonth;
+  
+  for (let i = actualDays - 1; i >= 0; i--) {
     const date = new Date(end);
     date.setDate(end.getDate() - i);
     const dateStr = date.toISOString().split('T')[0];
@@ -133,6 +146,9 @@ export async function getChatTrendData(endDate: string, days: number = 30): Prom
         date: dateStr,
         frustrationPercentage: dayData.overallMetrics.frustrationPercentage,
         confusionPercentage: dayData.overallMetrics.confusionPercentage,
+        frustratedCount: dayData.overallMetrics.frustratedCount,
+        confusedCount: dayData.overallMetrics.confusedCount,
+        totalPeople: dayData.overallMetrics.totalConversations,
       });
     }
   }

@@ -207,6 +207,56 @@ export default function ChatTrendChart({ data, isLoading }: ChatTrendChartProps)
           <p className="text-xs text-slate-400 mt-1">Current vs. {data.length} days ago</p>
         </div>
       </div>
+
+      {/* ── Cumulative Totals ── */}
+      {data.length > 0 && (
+        <div className="mt-6 pt-6 border-t border-slate-200">
+          <p className="text-xs text-slate-500 uppercase tracking-wide mb-4">Cumulative Totals (from {new Date(data[0].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} to {new Date(data[data.length - 1].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})</p>
+          <div className="grid grid-cols-2 gap-4">
+            {/* Total Frustrated */}
+            <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+              <p className="text-xs text-slate-600 uppercase tracking-wide mb-2">Total Frustrated</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-red-600">
+                  {data.reduce((sum, item) => sum + (item.frustratedCount || 0), 0)}
+                </span>
+                <span className="text-sm text-slate-600">
+                  out of {data.reduce((sum, item) => sum + (item.totalPeople || 0), 0)} total people
+                </span>
+              </div>
+              <div className="mt-2">
+                <span className="text-lg font-semibold text-red-700">
+                  {data.reduce((sum, item) => sum + (item.totalPeople || 0), 0) > 0
+                    ? ((data.reduce((sum, item) => sum + (item.frustratedCount || 0), 0) / data.reduce((sum, item) => sum + (item.totalPeople || 0), 0)) * 100).toFixed(1)
+                    : '0.0'}%
+                </span>
+                <span className="text-xs text-slate-500 ml-2">of total people</span>
+              </div>
+            </div>
+
+            {/* Total Confused */}
+            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+              <p className="text-xs text-slate-600 uppercase tracking-wide mb-2">Total Confused</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-blue-600">
+                  {data.reduce((sum, item) => sum + (item.confusedCount || 0), 0)}
+                </span>
+                <span className="text-sm text-slate-600">
+                  out of {data.reduce((sum, item) => sum + (item.totalPeople || 0), 0)} total people
+                </span>
+              </div>
+              <div className="mt-2">
+                <span className="text-lg font-semibold text-blue-700">
+                  {data.reduce((sum, item) => sum + (item.totalPeople || 0), 0) > 0
+                    ? ((data.reduce((sum, item) => sum + (item.confusedCount || 0), 0) / data.reduce((sum, item) => sum + (item.totalPeople || 0), 0)) * 100).toFixed(1)
+                    : '0.0'}%
+                </span>
+                <span className="text-xs text-slate-500 ml-2">of total people</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

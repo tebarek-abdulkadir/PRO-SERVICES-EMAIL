@@ -10,9 +10,10 @@ export const revalidate = 0;
  * GET /api/chat-analysis/trends
  * Query params: 
  *   - endDate: YYYY-MM-DD (optional, defaults to today)
- *   - days: number (optional, defaults to 14)
+ *   - days: number (optional, will be calculated from 1st of current month if not provided)
  * 
  * Returns trend data for frustration and confusion over time
+ * Date range goes back to max 1st of the current month
  */
 export async function GET(request: Request) {
   try {
@@ -31,17 +32,17 @@ export async function GET(request: Request) {
       }, { status: 400 });
     }
     
-    // Parse days parameter (default to 14)
-    const days = daysParam ? parseInt(daysParam, 10) : 14;
+    // Parse days parameter if provided (for backward compatibility)
+    const days = daysParam ? parseInt(daysParam, 10) : undefined;
     
-    if (isNaN(days) || days < 1 || days > 90) {
+    if (daysParam && (isNaN(days!) || days! < 1 || days! > 90)) {
       return NextResponse.json({
         success: false,
         error: 'Days must be a number between 1 and 90'
       }, { status: 400 });
     }
     
-    // Fetch trend data
+    // Fetch trend data (will automatically calculate from 1st of current month if days not provided)
     const trendData = await getChatTrendData(endDate, days);
     
     return NextResponse.json({
@@ -49,7 +50,7 @@ export async function GET(request: Request) {
       data: trendData,
       count: trendData.length,
       endDate,
-      days
+      days: days || 'auto (from 1st of current month)'
     });
     
   } catch (error) {

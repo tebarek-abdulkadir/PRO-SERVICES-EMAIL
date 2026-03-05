@@ -79,7 +79,8 @@ export default function ChatsDashboard() {
     const fetchTrendData = async () => {
       try {
         setIsLoadingTrends(true);
-        const response = await fetch(`/api/chat-analysis/trends?endDate=${selectedDate}&days=30`);
+        // API will automatically calculate from 1st of current month (max)
+        const response = await fetch(`/api/chat-analysis/trends?endDate=${selectedDate}`);
         const result = await response.json();
         
         if (result.success && result.data) {
