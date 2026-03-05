@@ -156,10 +156,8 @@ export default function PnLServiceChart({ data }: PnLServiceChartProps) {
   const totalRevenue = data.summary.totalRevenue;
   const totalVolume = Object.values(data.services).reduce((sum, s) => sum + s.volume, 0);
 
-  // Custom label function to show values on pie slices
+  // Custom label function to show values on pie slices - always show labels
   const renderLabel = (entry: any) => {
-    if (entry.percentage < 3) return ''; // Don't show labels for very small slices
-    
     if (viewMode === 'revenue') {
       return `${formatCurrency(entry.value)}`;
     } else {
@@ -219,7 +217,7 @@ export default function PnLServiceChart({ data }: PnLServiceChartProps) {
               data={pieData}
               cx="50%"
               cy="50%"
-              labelLine={false}
+              labelLine={true}
               label={renderLabel}
               innerRadius={80}
               outerRadius={140}

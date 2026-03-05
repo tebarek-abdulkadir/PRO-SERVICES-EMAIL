@@ -189,6 +189,8 @@ export default function ServiceBreakdownChart({
     dataKey: 'value',
     stroke: 'none',
     animationDuration: 400,
+    labelLine: true,
+    label: ({ name, value }: any) => `${name}\n${value}`,
   };
 
   return (

@@ -45,8 +45,8 @@ export default function ProspectChart({ oecCount, owwaCount, travelVisaCount }: 
             outerRadius={90}
             paddingAngle={3}
             dataKey="value"
-            label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
-            labelLine={false}
+            label={({ name, value, percent }) => `${name}\n${value} (${((percent || 0) * 100).toFixed(0)}%)`}
+            labelLine={true}
           >
             {data.map((entry) => (
               <Cell key={`cell-${entry.name}`} fill={COLORS[entry.name as keyof typeof COLORS]} />

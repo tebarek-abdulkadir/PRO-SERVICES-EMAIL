@@ -198,9 +198,8 @@ export default function PnLServiceDetail({ data, filter }: PnLServiceDetailProps
     return value.toString();
   };
 
-  // Custom label function to show values on pie slices
+  // Custom label function to show values on pie slices - always show labels
   const renderCustomizedLabel = (entry: any) => {
-    if (entry.percentage < 5) return ''; // Don't show labels for very small slices
     return `${formatCurrencyShort(entry.value)}`;
   };
 
@@ -341,7 +340,7 @@ export default function PnLServiceDetail({ data, filter }: PnLServiceDetailProps
                     data={pieData}
                     cx="50%"
                     cy="50%"
-                    labelLine={false}
+                    labelLine={true}
                     label={renderCustomizedLabel}
                     outerRadius={140}
                     paddingAngle={2}
@@ -402,7 +401,7 @@ export default function PnLServiceDetail({ data, filter }: PnLServiceDetailProps
                   data={pieData}
                   cx="50%"
                   cy="50%"
-                  labelLine={false}
+                  labelLine={true}
                   label={renderCustomizedLabel}
                   outerRadius={140}
                   paddingAngle={2}
