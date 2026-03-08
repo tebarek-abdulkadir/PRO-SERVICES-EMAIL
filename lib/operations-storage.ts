@@ -289,9 +289,7 @@ export async function getOperationsTrendData(endDate: string, days: number = 14)
       continue;
     }
     
-    // Calculate start of month for this date
-    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-    const startOfMonthStr = startOfMonth.toISOString().split('T')[0];
+    // Calculate month key for this date (all dates should be in the same month now)
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     
     const dayResult = await getDailyOperations(dateStr);
