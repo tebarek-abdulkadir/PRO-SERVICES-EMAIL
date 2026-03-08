@@ -304,31 +304,26 @@ export async function getOperationsTrendData(endDate: string, days: number = 14)
       const totalPending = totalPendingUs + totalPendingProVisit;
       
       // Calculate MTD completed (cumulative from start of month to this date)
-      let mtdCompleted = 0;
-      if (dateStr >= startOfMonthStr && dateStr <= endDate) {
-        // Initialize month totals if needed
-        if (!mtdTotalsByServiceByMonth[monthKey]) {
-          mtdTotalsByServiceByMonth[monthKey] = {};
-        }
-        
-        // Fetch all days from start of month to this date to calculate MTD accurately
-        // For efficiency, we'll accumulate as we go through the dates
-        const monthTotals = mtdTotalsByServiceByMonth[monthKey];
-        
-        // Update MTD totals for each service for this day
-        dayResult.data.operations.forEach(op => {
-          if (!monthTotals[op.serviceType]) {
-            monthTotals[op.serviceType] = 0;
-          }
-          // Only add if this date is within the month
-          if (dateStr >= startOfMonthStr) {
-            monthTotals[op.serviceType] += op.doneToday;
-          }
-        });
-        
-        // Sum all MTD totals for this month
-        mtdCompleted = Object.values(monthTotals).reduce((sum, val) => sum + val, 0);
+      // Since we're only iterating dates from start of month, all dates are valid for MTD
+      // Initialize month totals if needed
+      if (!mtdTotalsByServiceByMonth[monthKey]) {
+        mtdTotalsByServiceByMonth[monthKey] = {};
       }
+      
+      const monthTotals = mtdTotalsByServiceByMonth[monthKey];
+      
+      // Accumulate MTD totals for each service for this day
+      // This builds cumulative totals from the start of the month
+      dayResult.data.operations.forEach(op => {
+        if (!monthTotals[op.serviceType]) {
+          monthTotals[op.serviceType] = 0;
+        }
+        // Add today's completed cases to the cumulative MTD total
+        monthTotals[op.serviceType] += op.doneToday;
+      });
+      
+      // Sum all MTD totals for this month (cumulative from start of month to this date)
+      const mtdCompleted = Object.values(monthTotals).reduce((sum, val) => sum + val, 0);
       
       trendData.push({
         date: dateStr,

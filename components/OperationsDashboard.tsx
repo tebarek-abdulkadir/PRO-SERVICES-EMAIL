@@ -179,8 +179,11 @@ export default function OperationsDashboard() {
         const dataArray = Array.isArray(result.data) ? result.data : [result.data];
         
         // Filter and process only days from start of month to selected date
+        // Only include dates from the start of the current month (not past months)
         dataArray
-          .filter((dayData: OperationsData) => dayData.analysisDate <= endDate)
+          .filter((dayData: OperationsData) => 
+            dayData.analysisDate >= startDate && dayData.analysisDate <= endDate
+          )
           .forEach((dayData: OperationsData, dayIndex: number) => {
             console.log(`[MTD] Processing day ${dayIndex + 1}: ${dayData.analysisDate}`);
             
