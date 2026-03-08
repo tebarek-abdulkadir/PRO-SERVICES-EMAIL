@@ -263,11 +263,15 @@ export async function getOperationsDateRange(
  */
 export async function getOperationsTrendData(endDate: string, days: number = 14): Promise<OperationsTrendData[]> {
   const allTrendData: OperationsTrendData[] = [];
-  const end = new Date(endDate);
+  const end = new Date(endDate + 'T00:00:00'); // Ensure we're working with local date, not UTC
   
   // Calculate start of month for the endDate
   const startOfMonth = new Date(end.getFullYear(), end.getMonth(), 1);
   const startOfMonthStr = startOfMonth.toISOString().split('T')[0];
+  
+  // Get the month/year of the endDate to ensure we only include dates from this month
+  const targetYear = end.getFullYear();
+  const targetMonth = end.getMonth();
   
   // Calculate actual number of days from start of month to endDate
   const daysFromStartOfMonth = Math.floor((end.getTime() - startOfMonth.getTime()) / (1000 * 60 * 60 * 24)) + 1;
@@ -276,8 +280,8 @@ export async function getOperationsTrendData(endDate: string, days: number = 14)
   // But we'll only return the requested number of days
   const actualDays = Math.min(days, daysFromStartOfMonth);
   
-  // Track cumulative MTD completed per month
-  const mtdTotalsByServiceByMonth: Record<string, Record<string, number>> = {};
+  // Track cumulative MTD completed - only for the current month
+  const mtdTotalsByService: Record<string, number> = {};
   
   // Process ALL days from start of month to endDate to build accurate MTD totals
   for (let i = daysFromStartOfMonth - 1; i >= 0; i--) {
@@ -285,13 +289,15 @@ export async function getOperationsTrendData(endDate: string, days: number = 14)
     date.setDate(end.getDate() - i);
     const dateStr = date.toISOString().split('T')[0];
     
-    // Skip dates before the start of the month (safety check)
-    if (dateStr < startOfMonthStr) {
+    // Strict check: only process dates from the current month (same year and month)
+    if (date.getFullYear() !== targetYear || date.getMonth() !== targetMonth) {
       continue;
     }
     
-    // Calculate month key for this date (all dates should be in the same month now)
-    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    // Additional safety check: ensure date is >= start of month
+    if (dateStr < startOfMonthStr) {
+      continue;
+    }
     
     const dayResult = await getDailyOperations(dateStr);
     if (dayResult.success && dayResult.data) {
@@ -304,25 +310,18 @@ export async function getOperationsTrendData(endDate: string, days: number = 14)
       const totalPendingGov = dayResult.data.operations.reduce((sum, op) => sum + op.pendingGov, 0);
       const totalPending = totalPendingUs + totalPendingProVisit;
       
-      // Initialize month totals if needed
-      if (!mtdTotalsByServiceByMonth[monthKey]) {
-        mtdTotalsByServiceByMonth[monthKey] = {};
-      }
-      
-      const monthTotals = mtdTotalsByServiceByMonth[monthKey];
-      
       // Accumulate MTD totals for each service for this day
-      // This builds cumulative totals from the start of the month
+      // This builds cumulative totals from the start of the current month only
       dayResult.data.operations.forEach(op => {
-        if (!monthTotals[op.serviceType]) {
-          monthTotals[op.serviceType] = 0;
+        if (!mtdTotalsByService[op.serviceType]) {
+          mtdTotalsByService[op.serviceType] = 0;
         }
         // Add today's completed cases to the cumulative MTD total
-        monthTotals[op.serviceType] += op.doneToday;
+        mtdTotalsByService[op.serviceType] += op.doneToday;
       });
       
-      // Sum all MTD totals for this month (cumulative from start of month to this date)
-      const mtdCompleted = Object.values(monthTotals).reduce((sum, val) => sum + val, 0);
+      // Sum all MTD totals (cumulative from start of month to this date)
+      const mtdCompleted = Object.values(mtdTotalsByService).reduce((sum, val) => sum + val, 0);
       
       allTrendData.push({
         date: dateStr,
