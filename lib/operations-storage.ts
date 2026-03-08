@@ -262,7 +262,7 @@ export async function getOperationsDateRange(
  * Only goes back to the beginning of the current month (1st of the month), not past months
  */
 export async function getOperationsTrendData(endDate: string, days: number = 14): Promise<OperationsTrendData[]> {
-  const trendData: OperationsTrendData[] = [];
+  const allTrendData: OperationsTrendData[] = [];
   const end = new Date(endDate);
   
   // Calculate start of month for the endDate
@@ -272,14 +272,15 @@ export async function getOperationsTrendData(endDate: string, days: number = 14)
   // Calculate actual number of days from start of month to endDate
   const daysFromStartOfMonth = Math.floor((end.getTime() - startOfMonth.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   
-  // Use the minimum of requested days and days from start of month
-  // This ensures we never go back before the 1st of the current month
+  // For MTD accuracy, we need to process ALL days from start of month
+  // But we'll only return the requested number of days
   const actualDays = Math.min(days, daysFromStartOfMonth);
   
   // Track cumulative MTD completed per month
   const mtdTotalsByServiceByMonth: Record<string, Record<string, number>> = {};
   
-  for (let i = actualDays - 1; i >= 0; i--) {
+  // Process ALL days from start of month to endDate to build accurate MTD totals
+  for (let i = daysFromStartOfMonth - 1; i >= 0; i--) {
     const date = new Date(end);
     date.setDate(end.getDate() - i);
     const dateStr = date.toISOString().split('T')[0];
@@ -303,8 +304,6 @@ export async function getOperationsTrendData(endDate: string, days: number = 14)
       const totalPendingGov = dayResult.data.operations.reduce((sum, op) => sum + op.pendingGov, 0);
       const totalPending = totalPendingUs + totalPendingProVisit;
       
-      // Calculate MTD completed (cumulative from start of month to this date)
-      // Since we're only iterating dates from start of month, all dates are valid for MTD
       // Initialize month totals if needed
       if (!mtdTotalsByServiceByMonth[monthKey]) {
         mtdTotalsByServiceByMonth[monthKey] = {};
@@ -325,7 +324,7 @@ export async function getOperationsTrendData(endDate: string, days: number = 14)
       // Sum all MTD totals for this month (cumulative from start of month to this date)
       const mtdCompleted = Object.values(monthTotals).reduce((sum, val) => sum + val, 0);
       
-      trendData.push({
+      allTrendData.push({
         date: dateStr,
         casesDelayed: totalCasesDelayed,
         doneToday: totalDoneToday,
@@ -339,5 +338,8 @@ export async function getOperationsTrendData(endDate: string, days: number = 14)
     }
   }
   
-  return trendData;
+  // Return only the requested number of days (most recent days)
+  // This ensures MTD is accurate (includes all days from start of month) 
+  // but we only return the requested trend period
+  return allTrendData.slice(-actualDays);
 }
