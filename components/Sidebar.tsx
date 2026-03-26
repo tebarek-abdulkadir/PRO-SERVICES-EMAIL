@@ -1,6 +1,8 @@
 'use client';
 
-import { LayoutDashboard, Receipt, MessageSquare, Users, Clipboard, Star } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { LayoutDashboard, Receipt, MessageSquare, Users, Clipboard, Star, LogOut } from 'lucide-react';
 
 interface SidebarProps {
   activeTab: string;
@@ -17,8 +19,30 @@ const tabs = [
 ];
 
 export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+  const router = useRouter();
+  const [showSignOut, setShowSignOut] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/auth/status')
+      .then((r) => r.json())
+      .then((data: { passwordProtection?: boolean }) => {
+        if (!cancelled && data.passwordProtection) setShowSignOut(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleSignOut() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    router.push('/login');
+    router.refresh();
+  }
+
   return (
-    <div className="w-56 bg-white border-r border-slate-200 min-h-screen">
+    <div className="w-56 bg-white border-r border-slate-200 min-h-screen flex flex-col">
       <div className="p-5 border-b border-slate-100">
         <div className="flex items-center gap-3">
           <img 
@@ -33,7 +57,7 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
         </div>
       </div>
       
-      <nav className="p-2">
+      <nav className="p-2 flex-1">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const Icon = tab.Icon;
@@ -54,6 +78,19 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
           );
         })}
       </nav>
+
+      {showSignOut && (
+        <div className="p-2 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-base text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            <LogOut size={20} />
+            Sign out
+          </button>
+        </div>
+      )}
     </div>
   );
 }
