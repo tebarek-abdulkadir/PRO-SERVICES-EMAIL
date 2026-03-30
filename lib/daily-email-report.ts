@@ -1,5 +1,4 @@
 import { getDailyChatAnalysisData, getDailyDelayTimeData } from '@/lib/chat-storage';
-import type { ChatAnalysisData, DelayTimeData } from '@/lib/chat-types';
 import {
   buildProspectsEmailRows,
   buildSalesEmailRows,
@@ -13,7 +12,7 @@ import type { Prospects } from '@/lib/types';
 
 const REPORT_TIMEZONE = process.env.REPORT_TIMEZONE || 'Asia/Dubai';
 
-interface DashboardDateApiResponse {
+interface DatePayload {
   date: string;
   totalProcessed: number;
   totalConversations: number;
@@ -22,18 +21,6 @@ interface DashboardDateApiResponse {
   };
   countryCounts?: Record<string, number>;
   prospectDetails?: EnrichedProspectDetail[];
-}
-
-interface ChatApiResponse {
-  success: boolean;
-  data?: ChatAnalysisData;
-  error?: string;
-}
-
-interface DelayApiResponse {
-  success: boolean;
-  data?: DelayTimeData | null;
-  error?: string;
 }
 
 export type { EmailReportTableRow };
@@ -62,41 +49,12 @@ export interface DailyEmailReportData {
   };
 }
 
-interface InternalFetchOptions {
-  origin: string;
-  headers?: HeadersInit;
-}
-
 function parseBooleanParam(value: string | null): boolean {
   if (!value) {
     return false;
   }
 
   return ['1', 'true', 'yes'].includes(value.toLowerCase());
-}
-
-function createAbsoluteUrl(pathname: string, origin: string): string {
-  return new URL(pathname, origin).toString();
-}
-
-async function fetchDashboardJson<T>(
-  pathname: string,
-  { origin, headers }: InternalFetchOptions
-): Promise<T> {
-  const response = await fetch(createAbsoluteUrl(pathname, origin), {
-    method: 'GET',
-    headers,
-    cache: 'no-store',
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Request to ${pathname} failed with ${response.status}: ${errorText || response.statusText}`
-    );
-  }
-
-  return (await response.json()) as T;
 }
 
 function formatDisplayDate(date: string, timeZone: string): string {
@@ -109,32 +67,22 @@ function formatDisplayDate(date: string, timeZone: string): string {
   }).format(new Date(`${date}T12:00:00Z`));
 }
 
-async function loadDatePayload(
-  date: string,
-  options: InternalFetchOptions
-): Promise<DashboardDateApiResponse> {
-  const data = await fetchDashboardJson<DashboardDateApiResponse>(`/api/dates/${date}`, options).catch(
-    async () => {
-      const d = await getDashboardProspectsData(date);
-      return {
-        date: d.date,
-        totalProcessed: d.totalProcessed,
-        totalConversations: d.totalConversations,
-        prospects: d.prospects,
-        countryCounts: d.countryCounts,
-        prospectDetails: d.prospectDetails,
-      };
-    }
-  );
-
-  return data;
+async function loadDatePayload(date: string): Promise<DatePayload> {
+  const d = await getDashboardProspectsData(date);
+  return {
+    date: d.date,
+    totalProcessed: d.totalProcessed,
+    totalConversations: d.totalConversations,
+    prospects: d.prospects,
+    countryCounts: d.countryCounts,
+    prospectDetails: d.prospectDetails,
+  };
 }
 
 async function getProspectsAndSalesBlock(
-  date: string,
-  options: InternalFetchOptions
+  date: string
 ): Promise<Pick<DailyEmailReportData, 'prospects' | 'sales' | 'columnLabelShort'>> {
-  const data = await loadDatePayload(date, options);
+  const data = await loadDatePayload(date);
   const details =
     (data.prospects.details as EnrichedProspectDetail[] | undefined) ||
     data.prospectDetails ||
@@ -167,25 +115,15 @@ async function getProspectsAndSalesBlock(
 }
 
 async function getChatAnalysisMetrics(
-  date: string,
-  options: InternalFetchOptions
+  date: string
 ): Promise<Pick<DailyEmailReportData['chatAnalysis'], 'available' | 'frustrationPercent' | 'confusionPercent'>> {
-  const result = await fetchDashboardJson<ChatApiResponse>(`/api/chat-analysis?date=${date}`, options).catch(
-    async () => {
-      const data = await getDailyChatAnalysisData(date);
-      return {
-        success: Boolean(data),
-        data: data || undefined,
-        error: data ? undefined : `No chat analysis data available for ${date}`,
-      };
-    }
-  );
+  const data = await getDailyChatAnalysisData(date);
 
-  if (!result.success || !result.data) {
-    throw new Error(result.error || `No chat analysis data available for ${date}`);
+  if (!data) {
+    throw new Error(`No chat analysis data available for ${date}`);
   }
 
-  const m = result.data.overallMetrics;
+  const m = data.overallMetrics;
 
   return {
     available: true,
@@ -194,32 +132,16 @@ async function getChatAnalysisMetrics(
   };
 }
 
-async function getAverageResponseTime(
-  date: string,
-  options: InternalFetchOptions
-): Promise<string | null> {
-  const delayResult = await fetchDashboardJson<DelayApiResponse>(`/api/delay-time?date=${date}`, options).catch(
-    async () => {
-      const data = await getDailyDelayTimeData(date);
-      return { success: true, data };
-    }
-  );
-
-  if (!delayResult.success || !delayResult.data) {
-    return null;
-  }
-
-  return delayResult.data.dailyAverageDelayFormatted || null;
+async function getAverageResponseTime(date: string): Promise<string | null> {
+  const data = await getDailyDelayTimeData(date);
+  return data?.dailyAverageDelayFormatted || null;
 }
 
-export async function getDailyEmailReportData(
-  date: string,
-  options: InternalFetchOptions
-): Promise<DailyEmailReportData> {
+export async function getDailyEmailReportData(date: string): Promise<DailyEmailReportData> {
   const [block, chatMetrics, averageResponseTime] = await Promise.all([
-    getProspectsAndSalesBlock(date, options),
-    getChatAnalysisMetrics(date, options),
-    getAverageResponseTime(date, options),
+    getProspectsAndSalesBlock(date),
+    getChatAnalysisMetrics(date),
+    getAverageResponseTime(date),
   ]);
 
   return {

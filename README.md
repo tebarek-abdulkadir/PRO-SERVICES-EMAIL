@@ -88,7 +88,7 @@ Optional:
 APP_BASE_URL=
 ```
 
-`APP_BASE_URL` can be used if you want the cron route to fetch dashboard APIs from a fixed origin instead of the current request origin.
+`APP_BASE_URL` is optional: the cron response JSON includes an `origin` field for debugging; report data is read directly from storage (no internal HTTP to `/api/dates`).
 
 ### Manual testing
 

@@ -71,17 +71,8 @@ export async function GET(request: NextRequest) {
     const recipientsOverride = splitRecipientsParam(searchParams.get('to'));
     const recipients = getDailyReportRecipients(recipientsOverride);
     const origin = process.env.APP_BASE_URL || request.nextUrl.origin;
-    const internalHeaders: HeadersInit = process.env.CRON_SECRET
-      ? {
-          Authorization: `Bearer ${process.env.CRON_SECRET}`,
-          'x-internal-cron-secret': process.env.CRON_SECRET,
-        }
-      : {};
 
-    const report = await getDailyEmailReportData(date, {
-      origin,
-      headers: internalHeaders,
-    });
+    const report = await getDailyEmailReportData(date);
     const subject = buildDailyEmailSubject(report);
     const html = renderDailyEmailHtml(report);
     const text = renderDailyEmailText(report);
