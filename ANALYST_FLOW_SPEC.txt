@@ -1,0 +1,491 @@
+Dashboard Business Logic Spec
+=============================
+
+Purpose
+-------
+This document explains the business logic behind the main Dashboard views so a data analyst can understand what each metric means, how records are counted, and where interpretation can go wrong.
+
+The focus here is business meaning, not technical implementation.
+
+
+Executive Summary
+-----------------
+The Dashboard has 3 main business areas:
+
+1. Chats
+   Measures customer frustration and confusion.
+
+2. Agents
+   Measures agent response speed and working hours.
+
+3. Sales
+   Measures prospects, conversions, and revenue-related views.
+
+The most important thing to know is that the word "conversion" does not mean the same thing everywhere in the dashboard.
+
+
+==================================================
+1. CHATS BUSINESS LOGIC
+==================================================
+
+What the Chats dashboard is trying to answer
+--------------------------------------------
+The Chats view is designed to answer:
+
+- How many people showed frustration?
+- How many people showed confusion?
+- What issues are driving those outcomes?
+- Are those rates getting better or worse over time?
+
+What counts as a chat record
+----------------------------
+The chat logic works from already-classified conversation results.
+Each record arrives with labels such as:
+
+- frustrated or not
+- confused or not
+- main issues
+- key phrases
+- optional service/team context
+
+The dashboard is not deciding frustration from scratch.
+It is summarizing labels that were already assigned upstream.
+
+How chat records are grouped
+----------------------------
+The business rule is to avoid overcounting the same person when they appear in multiple conversations.
+
+The grouping priority is:
+
+1. contract
+2. client
+3. maid
+4. fallback conversation-level record
+
+This means the dashboard tries to treat multiple chats from the same underlying person or household context as one person-level case for top-line metrics.
+
+What the top-line chat metrics really mean
+------------------------------------------
+The most important rule:
+
+- Chat percentages are person-based, not conversation-based.
+
+So:
+
+- Frustrated count = number of unique people with at least one frustrated interaction
+- Confused count = number of unique people with at least one confused interaction
+- Total = number of unique people reviewed that day
+
+This matters because raw conversation volume can be much higher than the person count shown on the dashboard.
+
+How the conversation list should be interpreted
+-----------------------------------------------
+The conversation list is a review surface for problem cases.
+It is not the pure denominator for the headline percentages.
+
+In other words:
+
+- the list helps you inspect examples
+- the top cards help you understand the size of the problem at a people level
+
+How trends work
+---------------
+The trend view is effectively month-to-date.
+It compares the selected day to earlier days in that same month rather than acting like a full long-term historical trend engine.
+
+How issue insights work
+-----------------------
+Issue insights are driven by repeated issue themes found inside the frustrated or confused cases.
+
+Business interpretation:
+
+- "main issue" means the most commonly recurring issue among affected cases
+- "top drivers" means the most frequent issues associated with frustration or confusion
+
+What to be careful about
+------------------------
+1. A single person with multiple conversations should usually count once in the headline metrics.
+
+2. The top cards and the problem-conversation list are not using the exact same counting concept.
+
+3. The dashboard is only as good as the upstream classification.
+   If frustration or confusion labeling is noisy, the dashboard will reflect that.
+
+4. Cumulative trend views may feel larger than daily unique-person views because the same person can appear on more than one day.
+
+
+==================================================
+2. AGENTS BUSINESS LOGIC
+==================================================
+
+What the Agents dashboard is trying to answer
+---------------------------------------------
+The Agents view is designed to answer:
+
+- How fast are agents responding?
+- Who are the fastest and slowest responders?
+- How many hours did agents work?
+- Is response performance lining up with staffing effort?
+
+Two business inputs feed this view
+----------------------------------
+The dashboard combines two separate business feeds:
+
+1. Response-time feed
+   The speed at which agents reply.
+
+2. Hours-worked feed
+   Agent login/logout and total hours logged.
+
+These two feeds are related but independent.
+
+What the main metrics mean
+--------------------------
+- Active agents = agents included in the response-time feed for that day
+- Daily average response time = overall benchmark for the day
+- Agent ranking = ordered by fastest average response time
+- Total hours logged = total staffing effort recorded that day
+- Average hours per agent = average effort level across agents
+
+How the ranking works
+---------------------
+Lower response time is better.
+
+So:
+
+- faster response = higher performance rank
+- slower response = lower performance rank
+
+How hours are combined with response time
+-----------------------------------------
+Hours are used as supporting context, not as the ranking metric itself.
+
+The dashboard is essentially asking:
+
+- who responded quickly,
+- and how many hours did that person work?
+
+Business interpretation:
+
+- a fast response time with low hours may suggest high efficiency or a small shift
+- a slow response time with high hours may suggest workload or process issues
+
+What to be careful about
+------------------------
+1. Response time is the primary metric.
+   Hours do not change ranking order.
+
+2. Hours data may be missing for some dates or some agents.
+   The response-time view can still exist without a complete hours picture.
+
+3. If names are inconsistent between sources, some hours may not attach cleanly to the correct agent.
+
+4. Date selection is mainly day-based for business interpretation, even if the interface visually suggests more flexibility.
+
+
+==================================================
+3. SALES BUSINESS LOGIC
+==================================================
+
+What the Sales area is trying to answer
+---------------------------------------
+The Sales side of the dashboard is designed to answer:
+
+- How many prospects were identified?
+- How many of those prospects converted?
+- Which services are strongest?
+- How do counts break down by contract type or country?
+- What do revenue and profit look like over time?
+
+The biggest source of confusion
+-------------------------------
+There are multiple business definitions of conversion in this system.
+
+They should not be treated as interchangeable.
+
+There are 4 main commercial views:
+
+1. Prospect volume
+2. Complaint-based conversion
+3. Payment-based conversion
+4. P&L / revenue logic
+
+There is also a separate overseas-sales measure from To Do records.
+
+
+3A. Prospect logic
+------------------
+
+What a prospect is
+------------------
+A prospect is a conversation or household that was identified as having interest in one of the tracked services, such as:
+
+- OEC
+- OWWA
+- Travel Visa
+- Filipina Passport Renewal
+- Ethiopian Passport Renewal
+
+How prospects are counted
+-------------------------
+Prospects are not always counted as simple raw rows.
+The business logic tries to reduce double counting by grouping related records together, especially at household or contract level.
+
+This means:
+
+- multiple related records can collapse into one prospect opportunity
+- counts are intended to reflect real opportunities more than raw chat volume
+
+Why prospect counts can change after filtering
+----------------------------------------------
+Before the main dashboard reports prospect counts, it removes prospects that already had earlier complaints before the selected day.
+
+Business meaning:
+
+- the dashboard is trying to focus on fresh eligible opportunities
+- not every historically identified prospect remains in scope for the selected day
+
+What contract type and country breakdowns mean
+----------------------------------------------
+- Contract type breakdown shows how prospect opportunities split across major contract categories
+- Country breakdown applies mainly to travel visa prospects
+
+These breakdowns are best interpreted as segmented opportunity counts, not raw inquiry counts.
+
+
+3B. Complaint-based conversion logic
+------------------------------------
+
+What it means
+-------------
+In the main Sales dashboard, conversion usually means:
+
+- a prospect that also has a matching complaint outcome on the selected day
+
+This is the core business rule behind the main conversion cards in the daily sales view.
+
+Business interpretation:
+
+- the system is using complaint activity as evidence that the prospect moved into a converted state for that service
+
+Why this matters
+----------------
+This is not the same thing as payment collection.
+
+So if someone asks:
+
+"Why do dashboard conversions not equal cash received?"
+
+The answer is:
+
+- because the main dashboard is not using payment as its primary conversion definition
+
+When to use this metric
+-----------------------
+Use complaint-based conversion when you want to understand operationally recognized service completions or downstream complaint-linked outcomes tied to prospects.
+
+
+3C. Payment-based conversion logic
+----------------------------------
+
+What it means
+-------------
+There is a separate conversion view that uses payments.
+
+In that view, conversion means:
+
+- a prospect with a received payment on the selected day
+
+Business interpretation:
+
+- this is closer to a commercial or cash-confirmed conversion view
+
+Why it can disagree with the main Sales dashboard
+-------------------------------------------------
+Payment-based conversion and complaint-based conversion are built from different business events.
+
+So they can differ because:
+
+- some cases have complaint evidence but no same-day payment
+- some cases have payment evidence but do not appear as complaint-linked conversions
+- timing can differ across systems
+
+How to use it
+-------------
+Use payment-based conversion when you want a stricter financial conversion lens.
+
+
+3D. Clean conversion logic
+--------------------------
+
+What it means
+-------------
+The system also supports a "clean conversion" view.
+
+This asks:
+
+- of the prospects that converted by payment, how many did so without relevant complaint issues?
+
+Business interpretation:
+
+- overall conversion rate tells you volume converted
+- clean conversion rate tells you volume converted without complaint signals
+
+This is useful for quality-adjusted conversion analysis.
+
+
+3E. P&L logic
+-------------
+
+What the P&L view is trying to answer
+-------------------------------------
+The P&L view is designed to answer:
+
+- what service volume happened in a period
+- what revenue that volume implies
+- what cost that volume implies
+- what gross profit and net profit look like
+
+What drives the P&L volume
+--------------------------
+The default logic is complaint-driven, not payment-driven.
+
+Business meaning:
+
+- complaint activity is treated as the primary signal for service volume
+- that volume is then translated into revenue and cost using pricing rules
+
+How duplicate sales are handled
+-------------------------------
+The P&L logic applies a 3-month deduplication rule.
+
+Business rule:
+
+- repeated complaint activity for the same service/person combination within 3 months is treated as the same sale
+- if it happens more than 3 months later, it can count as a new sale
+
+Why pricing can change across time
+----------------------------------
+The P&L logic uses different pricing before and after a specific price-change date.
+
+Business interpretation:
+
+- the same service may produce different revenue or margin depending on when the sale happened
+
+What to be careful about
+------------------------
+1. P&L is not a direct payment ledger.
+   It is primarily a modeled financial view based on complaint-derived service volume.
+
+2. Revenue trends can move because of both:
+   - volume changes
+   - pricing changes
+
+3. If complaint capture is incomplete, P&L volume may understate business reality.
+
+
+3F. Overseas sales from To Dos
+------------------------------
+
+What it means
+-------------
+There is also a separate sales-like measure built from overseas-related To Do records.
+
+Business rule:
+
+- multiple To Dos close together for the same underlying case are treated as one sale period
+- if they are far enough apart, they can count as more than one sale
+
+How to use it
+-------------
+This should be treated as a separate operational sales proxy.
+
+It should not automatically be added into:
+
+- complaint-based conversions
+- payment-based conversions
+- P&L conversion counts
+
+unless the business team explicitly decides to unify them.
+
+
+==================================================
+4. KEY DEFINITIONS
+==================================================
+
+Prospect
+--------
+A person, household, or case identified as having interest in one of the tracked services.
+
+Main dashboard conversion
+-------------------------
+A prospect that is treated as converted based on same-day complaint-linked logic.
+
+Payment conversion
+------------------
+A prospect treated as converted because a received payment exists on the selected day.
+
+Clean conversion
+----------------
+A payment conversion without relevant complaint signals.
+
+P&L volume
+----------
+A deduplicated count of service activity used to estimate revenue and profit.
+
+Chat total
+----------
+A unique-person count, not a raw conversation count.
+
+
+==================================================
+5. MOST IMPORTANT BUSINESS WARNINGS
+==================================================
+
+1. Never assume "conversion" means one single thing across the dashboard.
+
+2. The main Sales dashboard conversion is not the same as payment conversion.
+
+3. Prospect counts are filtered.
+   A previously flagged prospect may be excluded from a later day if prior complaint history exists.
+
+4. Chats are person-based at the top level.
+   Do not compare chat totals directly to raw conversation counts.
+
+5. Agents are judged primarily on response speed, with hours used as supporting context.
+
+6. P&L is modeled from service activity signals, not simply from payments received.
+
+7. Overseas To Do sales are a separate business view and should not be mixed into other conversion logic without explicit alignment.
+
+
+==================================================
+6. HOW TO TALK ABOUT THE DASHBOARD
+==================================================
+
+If presenting to business stakeholders, the safest language is:
+
+- Chats shows customer experience risk at a people level.
+- Agents shows service responsiveness and staffing context.
+- Sales shows opportunity volume, but conversion must be clarified by method.
+- Main dashboard conversions are operational/complaint-linked.
+- Payment conversions are commercial cash-linked.
+- P&L is a modeled profitability view based on service activity.
+
+
+==================================================
+7. SIMPLE REFERENCE
+==================================================
+
+Use this cheat sheet:
+
+- If you want customer pain: use Chats.
+- If you want service speed: use Agents.
+- If you want fresh opportunity counts: use main Sales prospects.
+- If you want operational conversion: use main Sales conversions.
+- If you want payment-confirmed conversion: use payment conversion logic.
+- If you want quality-adjusted conversion: use clean conversion logic.
+- If you want modeled profitability: use P&L.
+
+
+End of business spec.

@@ -46,4 +46,66 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# trigger rebuild
+
+## Daily SMTP Email Automation
+
+The project includes a scheduled daily email route at `app/api/cron/daily-email/route.ts`.
+
+### What it sends
+
+- Prospects totals by service
+- Chats metrics from the dashboard chat analysis API
+- Agents response-time metrics and rankings
+- Agent hours when available
+
+Ops data is intentionally excluded from this email.
+
+### Schedule
+
+`vercel.json` schedules the route to run daily at `0 4 * * *` UTC, which is `8:00 AM` Dubai time (`Asia/Dubai`).
+
+By default, the route reports the previous calendar day in Dubai time. You can override the date manually with the `date` query parameter.
+
+### Required environment variables
+
+Set these in your deployment environment:
+
+```bash
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASSWORD=
+SMTP_FROM_EMAIL=
+SMTP_USE_TLS=true
+DAILY_REPORT_RECIPIENTS=sahar.sabbagh@maids.cc
+CRON_SECRET=
+REPORT_TIMEZONE=Asia/Dubai
+```
+
+Optional:
+
+```bash
+APP_BASE_URL=
+```
+
+`APP_BASE_URL` can be used if you want the cron route to fetch dashboard APIs from a fixed origin instead of the current request origin.
+
+### Manual testing
+
+Preview the generated payload and HTML without sending an email:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" "http://localhost:3000/api/cron/daily-email?date=2026-03-08&dryRun=true"
+```
+
+Send the email manually for a specific date:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" "http://localhost:3000/api/cron/daily-email?date=2026-03-08"
+```
+
+Override recipients for a one-off test:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" "http://localhost:3000/api/cron/daily-email?date=2026-03-08&to=sahar.sabbagh@maids.cc"
+```

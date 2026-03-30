@@ -4,12 +4,17 @@ import { getCookieSecret, verifyToken } from "@/lib/dashboard-auth";
 
 export async function middleware(request: NextRequest) {
   const password = process.env.DASHBOARD_PASSWORD;
+  const cronSecret = process.env.CRON_SECRET;
   if (!password) {
     return NextResponse.next();
   }
 
   const path = request.nextUrl.pathname;
   const token = request.cookies.get("dashboard_session")?.value;
+  const authorization = request.headers.get("authorization");
+  const bearerToken = authorization?.startsWith("Bearer ")
+    ? authorization.slice(7)
+    : authorization;
   const secret = await getCookieSecret();
   const isAuthed = !!(token && (await verifyToken(secret, token)));
 
@@ -23,7 +28,17 @@ export async function middleware(request: NextRequest) {
   if (
     path === "/api/auth/login" ||
     path === "/api/auth/logout" ||
-    path === "/api/auth/status"
+    path === "/api/auth/status" ||
+    path === "/api/cron/daily-email"
+  ) {
+    return NextResponse.next();
+  }
+
+  if (
+    path.startsWith("/api/") &&
+    cronSecret &&
+    (request.headers.get("x-internal-cron-secret") === cronSecret ||
+      bearerToken === cronSecret)
   ) {
     return NextResponse.next();
   }
