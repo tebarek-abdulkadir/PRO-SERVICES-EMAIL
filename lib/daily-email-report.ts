@@ -1,3 +1,4 @@
+import { getChatEmailTableMetrics } from '@/lib/chat-email-metrics';
 import { getDailyChatAnalysisData, getDailyDelayTimeData } from '@/lib/chat-storage';
 import {
   buildServiceOverviewRows,
@@ -52,8 +53,12 @@ export interface DailyEmailReportData {
     frustrationPercent: number;
     confusionPercent: number;
     totalChats: number;
-    frustratedCount: number;
-    confusedCount: number;
+    /** Unique people with frustration (same as Chats page “Frustrated People”) */
+    frustratedClients: number;
+    frustratedChats: number;
+    /** Unique people with confusion (same as Chats page “Confused People”) */
+    confusedClients: number;
+    confusedChats: number;
   };
 }
 
@@ -139,6 +144,7 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
   }
 
   const m = chatData.overallMetrics;
+  const chatTable = getChatEmailTableMetrics(chatData);
 
   return {
     date,
@@ -152,9 +158,11 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
       averageResponseTime,
       frustrationPercent: m.frustrationPercentage || 0,
       confusionPercent: m.confusionPercentage || 0,
-      totalChats: m.totalConversations || 0,
-      frustratedCount: m.frustratedCount || 0,
-      confusedCount: m.confusedCount || 0,
+      totalChats: chatTable.totalChats,
+      frustratedClients: chatTable.frustratedClients,
+      frustratedChats: chatTable.frustratedChats,
+      confusedClients: chatTable.confusedClients,
+      confusedChats: chatTable.confusedChats,
     },
   };
 }

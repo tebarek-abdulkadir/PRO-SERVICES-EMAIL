@@ -135,7 +135,7 @@ function renderCsatReplyRateTable(): string {
 }
 
 function renderChatMetricsTable(report: DailyEmailReportData): string {
-  const tc = report.chatAnalysis.totalChats;
+  const c = report.chatAnalysis;
 
   return `
     <table style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:560px;margin:0 0 16px 0" cellspacing="0" cellpadding="0">
@@ -152,13 +152,13 @@ function renderChatMetricsTable(report: DailyEmailReportData): string {
       </thead>
       <tbody>
         <tr style="background:#fff">
-          <td style="${tdBase};text-align:center">${tc}</td>
-          <td style="${tdMuted}">${EM}</td>
-          <td style="${tdMuted}">${EM}</td>
-          <td style="${tdMuted}">${EM}</td>
-          <td style="${tdMuted}">${EM}</td>
-          <td style="${tdMuted}">${EM}</td>
-          <td style="${tdMuted}">${EM}</td>
+          <td style="${tdBase};text-align:center">${c.totalChats}</td>
+          <td style="${tdBase};text-align:center">${c.frustratedClients}</td>
+          <td style="${tdBase};text-align:center">${c.frustratedChats}</td>
+          <td style="${tdBase};text-align:center">${c.confusedClients}</td>
+          <td style="${tdBase};text-align:center">${c.confusedChats}</td>
+          <td style="${tdBase};text-align:center">0</td>
+          <td style="${tdBase};text-align:center">0%</td>
         </tr>
       </tbody>
     </table>`;
@@ -249,6 +249,10 @@ export function renderDailyEmailText(report: DailyEmailReportData): string {
     '',
     '3. Chat Analysis',
     `  Total chats: ${report.chatAnalysis.totalChats}`,
+    `  Frustrated clients: ${report.chatAnalysis.frustratedClients}`,
+    `  Frustrated chats: ${report.chatAnalysis.frustratedChats}`,
+    `  Confused clients: ${report.chatAnalysis.confusedClients}`,
+    `  Confused chats: ${report.chatAnalysis.confusedChats}`,
     `  Frustration rate: ${formatPercent(report.chatAnalysis.frustrationPercent)}`,
     `  Confusion rate: ${formatPercent(report.chatAnalysis.confusionPercent)}`,
     '',

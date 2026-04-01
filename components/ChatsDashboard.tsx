@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Calendar, AlertTriangle, MessageSquare, Frown, HelpCircle, Clock } from 'lucide-react';
+import { dedupeChatConversationResults } from '@/lib/chat-email-metrics';
 import type { ChatAnalysisData, ChatTrendData } from '@/lib/chat-types';
 import DatePickerCalendar from '@/components/DatePickerCalendar';
 import ChatTrendChart from '@/components/ChatTrendChart';
@@ -193,33 +194,7 @@ export default function ChatsDashboard() {
   const frustrationPercentage = data.overallMetrics.frustrationPercentage;
   const confusionPercentage = data.overallMetrics.confusionPercentage;
   
-  // Deduplicate conversations for display purposes (conversation list)
-  const deduplicatedConversations = data.conversationResults.reduce((acc, conv) => {
-    const existing = acc.get(conv.conversationId);
-    
-    if (!existing) {
-      acc.set(conv.conversationId, conv);
-    } else {
-      // Keep the one with more data (issues or phrases)
-      const existingHasData = (existing.mainIssues?.length || 0) + (existing.keyPhrases?.length || 0);
-      const currentHasData = (conv.mainIssues?.length || 0) + (conv.keyPhrases?.length || 0);
-      
-      if (currentHasData > existingHasData) {
-        acc.set(conv.conversationId, conv);
-      } else if (currentHasData === existingHasData) {
-        // If data is equal, keep the one with both flags set if available
-        const existingBothFlags = existing.frustrated && existing.confused;
-        const currentBothFlags = conv.frustrated && conv.confused;
-        if (currentBothFlags && !existingBothFlags) {
-          acc.set(conv.conversationId, conv);
-        }
-      }
-    }
-    
-    return acc;
-  }, new Map<string, typeof data.conversationResults[0]>());
-
-  const deduplicatedArray = Array.from(deduplicatedConversations.values());
+  const deduplicatedArray = dedupeChatConversationResults(data.conversationResults);
   
   // Calculate additional metrics for display
   const bothFrustratedAndConfused = deduplicatedArray.filter(c => c.frustrated && c.confused).length;
