@@ -1,7 +1,22 @@
 import { getAllComplaintsBeforeDate, filterProspectsWithoutPreviousComplaints } from '@/lib/complaints-conversion-service';
+import { EMAIL_TRAVEL_REGIONS, resolveEmailTravelRegionKey } from '@/lib/email-travel-regions';
 import { getServiceKeyFromComplaintType } from '@/lib/pnl-complaints-types';
 import type { ByContractType, Conversions, Prospects } from '@/lib/types';
 import { getDailyData, getLatestRun, getProspectDetailsByDate, getProspectsGroupedByHousehold } from '@/lib/unified-storage';
+
+const TRAVEL_COMPLAINT_SERVICE_KEYS = new Set([
+  'ttl',
+  'ttlSingle',
+  'ttlDouble',
+  'ttlMultiple',
+  'tte',
+  'tteSingle',
+  'tteDouble',
+  'tteMultiple',
+  'ttj',
+  'schengen',
+  'gcc',
+]);
 
 type StoredProspectDetail = Awaited<ReturnType<typeof getProspectDetailsByDate>>[number];
 type StoredHouseholdGroup = Awaited<ReturnType<typeof getProspectsGroupedByHousehold>>[number];
@@ -19,6 +34,15 @@ export interface EnrichedProspectDetail extends StoredProspectDetail {
   convertedServices: string[];
 }
 
+/** Unique conversion counts for the email service table: same prospect keys as dashboard conversions, CC/MV from household contract (matches by-contract-type prospects). */
+export interface EmailSalesCcMvSplit {
+  oec: { cc: number; mv: number };
+  owwa: { cc: number; mv: number };
+  filipinaPassportRenewal: { cc: number; mv: number };
+  ethiopianPassportRenewal: { cc: number; mv: number };
+  travel: Record<string, { cc: number; mv: number }>;
+}
+
 export interface DashboardProspectsData {
   date: string;
   fileName?: string;
@@ -33,6 +57,8 @@ export interface DashboardProspectsData {
   /** Travel-visa country counts split by household contract type (MV vs CC), same rules as `countryCounts` */
   countryCountsByContractType: { MV: Record<string, number>; CC: Record<string, number> };
   byContractType: ByContractType;
+  /** Deduped sales (unique prospect keys) split CC/MV using household contract type — aligns with dashboard conversions + byContractType. */
+  emailSalesCcMv: EmailSalesCcMvSplit;
   latestRun: Awaited<ReturnType<typeof getLatestRun>>;
   households: StoredHouseholdGroup[];
   prospectDetails: EnrichedProspectDetail[];
@@ -106,7 +132,7 @@ function enrichProspectsWithComplaintStatus(
           convertedServices.push('OWWA');
         } else if (
           serviceKey &&
-          ['ttl', 'ttlSingle', 'ttlDouble', 'ttlMultiple', 'tte', 'tteSingle', 'tteDouble', 'tteMultiple', 'ttj', 'schengen', 'gcc'].includes(serviceKey) &&
+          TRAVEL_COMPLAINT_SERVICE_KEYS.has(serviceKey) &&
           prospect.isTravelVisaProspect &&
           !convertedServices.includes('Travel Visa')
         ) {
@@ -137,7 +163,8 @@ function enrichProspectsWithComplaintStatus(
 
 async function calculateConversionsForDate(
   date: string,
-  prospects: StoredProspectDetail[]
+  prospects: StoredProspectDetail[],
+  preloadedComplaints?: ComplaintRecord[]
 ): Promise<Conversions> {
   if (prospects.length === 0) {
     return {
@@ -150,7 +177,7 @@ async function calculateConversionsForDate(
   }
 
   try {
-    const complaints = await getComplaintsForDate(date);
+    const complaints = preloadedComplaints ?? (await getComplaintsForDate(date));
 
     const conversions = {
       oec: new Set<string>(),
@@ -191,7 +218,7 @@ async function calculateConversionsForDate(
           conversions.owwa.add(prospectKey);
         } else if (
           serviceKey &&
-          ['ttl', 'ttlSingle', 'ttlDouble', 'ttlMultiple', 'tte', 'tteSingle', 'tteDouble', 'tteMultiple', 'ttj', 'schengen', 'gcc'].includes(serviceKey) &&
+          TRAVEL_COMPLAINT_SERVICE_KEYS.has(serviceKey) &&
           prospect.isTravelVisaProspect
         ) {
           conversions.travelVisa.add(prospectKey);
@@ -226,6 +253,110 @@ async function calculateConversionsForDate(
       ethiopianPassportRenewal: 0,
     };
   }
+}
+
+function householdMembersContractBucket(members: StoredProspectDetail[]): 'CC' | 'MV' | null {
+  const contractType = members.find((m) => m.contractType)?.contractType || '';
+  if (contractType === 'CC') return 'CC';
+  if (contractType === 'MV') return 'MV';
+  return null;
+}
+
+function computeEmailSalesCcMvSplit(
+  prospects: StoredProspectDetail[],
+  complaints: ComplaintRecord[],
+  householdMap: Map<string, StoredProspectDetail[]>
+): EmailSalesCcMvSplit {
+  const oecCC = new Set<string>();
+  const oecMV = new Set<string>();
+  const owwaCC = new Set<string>();
+  const owwaMV = new Set<string>();
+  const filCC = new Set<string>();
+  const filMV = new Set<string>();
+  const ethCC = new Set<string>();
+  const ethMV = new Set<string>();
+
+  const travelSets: Record<string, { cc: Set<string>; mv: Set<string> }> = {};
+  for (const { key } of EMAIL_TRAVEL_REGIONS) {
+    travelSets[key] = { cc: new Set(), mv: new Set() };
+  }
+
+  for (const prospect of prospects) {
+    const matchingComplaints = complaints.filter((complaint) => {
+      return (
+        (prospect.contractId && complaint.contractId === prospect.contractId) ||
+        (prospect.maidId && complaint.housemaidId === prospect.maidId) ||
+        (prospect.clientId && complaint.clientId === prospect.clientId)
+      );
+    });
+
+    if (matchingComplaints.length === 0) {
+      continue;
+    }
+
+    const prospectKey = prospect.contractId || prospect.maidId || prospect.clientId;
+    if (!prospectKey) {
+      continue;
+    }
+
+    const householdKey =
+      prospect.contractId || `standalone_${prospect.maidId || prospect.clientId || 'unknown'}`;
+    const members = householdMap.get(householdKey) || [];
+    const bucket = householdMembersContractBucket(members);
+    if (!bucket) {
+      continue;
+    }
+
+    const addTo = (ccSet: Set<string>, mvSet: Set<string>) => {
+      if (bucket === 'CC') {
+        ccSet.add(prospectKey);
+      } else {
+        mvSet.add(prospectKey);
+      }
+    };
+
+    for (const complaint of matchingComplaints) {
+      if (!complaint.complaintType) {
+        continue;
+      }
+
+      const serviceKey = getServiceKeyFromComplaintType(complaint.complaintType);
+
+      if (serviceKey === 'oec' && prospect.isOECProspect) {
+        addTo(oecCC, oecMV);
+      } else if (serviceKey === 'owwa' && prospect.isOWWAProspect) {
+        addTo(owwaCC, owwaMV);
+      } else if (
+        serviceKey &&
+        TRAVEL_COMPLAINT_SERVICE_KEYS.has(serviceKey) &&
+        prospect.isTravelVisaProspect
+      ) {
+        const region = resolveEmailTravelRegionKey(prospect.travelVisaCountries);
+        const ts = region ? travelSets[region] : undefined;
+        if (ts) {
+          addTo(ts.cc, ts.mv);
+        }
+      } else if (serviceKey === 'filipinaPP' && prospect.isFilipinaPassportRenewalProspect) {
+        addTo(filCC, filMV);
+      } else if (serviceKey === 'ethiopianPP' && prospect.isEthiopianPassportRenewalProspect) {
+        addTo(ethCC, ethMV);
+      }
+    }
+  }
+
+  const travel: EmailSalesCcMvSplit['travel'] = {};
+  for (const { key } of EMAIL_TRAVEL_REGIONS) {
+    const s = travelSets[key];
+    travel[key] = { cc: s.cc.size, mv: s.mv.size };
+  }
+
+  return {
+    oec: { cc: oecCC.size, mv: oecMV.size },
+    owwa: { cc: owwaCC.size, mv: owwaMV.size },
+    filipinaPassportRenewal: { cc: filCC.size, mv: filMV.size },
+    ethiopianPassportRenewal: { cc: ethCC.size, mv: ethMV.size },
+    travel,
+  };
 }
 
 export async function getDashboardProspectsData(date: string): Promise<DashboardProspectsData> {
@@ -272,7 +403,7 @@ export async function getDashboardProspectsData(date: string): Promise<Dashboard
     ).length,
   };
 
-  const conversions = await calculateConversionsForDate(date, filteredProspects);
+  const conversions = await calculateConversionsForDate(date, filteredProspects, complaintsOnDate);
   const byContractType: ByContractType = {
     CC: {
       oec: 0,
@@ -394,6 +525,8 @@ export async function getDashboardProspectsData(date: string): Promise<Dashboard
     }
   }
 
+  const emailSalesCcMv = computeEmailSalesCcMvSplit(filteredProspects, complaintsOnDate, householdMap);
+
   return {
     date,
     fileName: data.fileName,
@@ -408,6 +541,7 @@ export async function getDashboardProspectsData(date: string): Promise<Dashboard
     countryCounts,
     countryCountsByContractType,
     byContractType,
+    emailSalesCcMv,
     latestRun,
     households,
     prospectDetails: enrichedProspects,

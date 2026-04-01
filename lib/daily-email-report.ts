@@ -7,7 +7,7 @@ import {
   shortDateColumnLabel,
   type ServiceOverviewRow,
 } from '@/lib/email-report-layout';
-import type { EnrichedProspectDetail } from '@/lib/prospects-report';
+import type { EmailSalesCcMvSplit, EnrichedProspectDetail } from '@/lib/prospects-report';
 import { getDashboardProspectsData } from '@/lib/prospects-report';
 import type { ByContractType, Prospects } from '@/lib/types';
 
@@ -23,6 +23,7 @@ interface DatePayload {
   countryCounts?: Record<string, number>;
   countryCountsByContractType?: { MV: Record<string, number>; CC: Record<string, number> };
   byContractType?: ByContractType;
+  emailSalesCcMv?: EmailSalesCcMvSplit;
   prospectDetails?: EnrichedProspectDetail[];
 }
 
@@ -84,6 +85,7 @@ async function loadDatePayload(date: string): Promise<DatePayload> {
     countryCounts: d.countryCounts,
     countryCountsByContractType: d.countryCountsByContractType,
     byContractType: d.byContractType,
+    emailSalesCcMv: d.emailSalesCcMv,
     prospectDetails: d.prospectDetails,
   };
 }
@@ -92,22 +94,16 @@ async function getProspectsAndSalesBlock(
   date: string
 ): Promise<Pick<DailyEmailReportData, 'prospects' | 'columnLabelShort'>> {
   const data = await loadDatePayload(date);
-  const details =
-    (data.prospects.details as EnrichedProspectDetail[] | undefined) ||
-    data.prospectDetails ||
-    [];
   const countryCountsByContractType = data.countryCountsByContractType || { MV: {}, CC: {} };
   const byContractType = data.byContractType;
   if (!byContractType) {
     throw new Error('Missing byContractType for email report; ensure dashboard data includes MV/CC breakdown.');
   }
+  if (!data.emailSalesCcMv) {
+    throw new Error('Missing emailSalesCcMv for email report; ensure prospects data includes conversion split.');
+  }
 
-  const enriched = details.map((d) => ({
-    ...d,
-    convertedServices: d.convertedServices || [],
-  }));
-
-  const rows = buildServiceOverviewRows(byContractType, countryCountsByContractType, enriched);
+  const rows = buildServiceOverviewRows(byContractType, countryCountsByContractType, data.emailSalesCcMv);
   const totalProspects = serviceOverviewProspectTotal(rows);
   const totalSalesCount = serviceOverviewSalesTotal(rows);
 

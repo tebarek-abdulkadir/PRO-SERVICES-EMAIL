@@ -1,3 +1,4 @@
+import type { EmailSalesCcMvSplit } from '@/lib/prospects-report';
 import type { ByContractType } from '@/lib/types';
 import type { EnrichedProspectDetail } from '@/lib/prospects-report';
 
@@ -47,12 +48,6 @@ function matchAliases(key: string, aliases: string[]): boolean {
   return aliases.some((a) => k === a || k.includes(a));
 }
 
-function contractKind(contractType: string | undefined): 'CC' | 'MV' | null {
-  if (contractType === 'CC') return 'CC';
-  if (contractType === 'MV') return 'MV';
-  return null;
-}
-
 /** Matches stakeholder layout: OEC, OWWA, Visa Lebanon, Visa Egypt, Visa Jordan, Visa Schengen (incl. other travel), passports */
 export function formatServiceConversionRate(prospectTotal: number, salesTotal: number): string {
   if (prospectTotal <= 0) {
@@ -78,111 +73,11 @@ function serviceOverviewRow(
   };
 }
 
-function countOecSalesByContract(details: EnrichedProspectDetail[]): { cc: number; mv: number } {
-  let cc = 0;
-  let mv = 0;
-  for (const p of details) {
-    if (!p.isOECProspect || !p.convertedServices.includes('OEC')) continue;
-    const k = contractKind(p.contractType);
-    if (k === 'CC') cc++;
-    else if (k === 'MV') mv++;
-  }
-  return { cc, mv };
-}
-
-function countOwwaSalesByContract(details: EnrichedProspectDetail[]): { cc: number; mv: number } {
-  let cc = 0;
-  let mv = 0;
-  for (const p of details) {
-    if (!p.isOWWAProspect || !p.convertedServices.includes('OWWA')) continue;
-    const k = contractKind(p.contractType);
-    if (k === 'CC') cc++;
-    else if (k === 'MV') mv++;
-  }
-  return { cc, mv };
-}
-
-function countFilipinaSalesByContract(details: EnrichedProspectDetail[]): { cc: number; mv: number } {
-  let cc = 0;
-  let mv = 0;
-  for (const p of details) {
-    if (!p.isFilipinaPassportRenewalProspect || !p.convertedServices.includes('Filipina PP')) continue;
-    const k = contractKind(p.contractType);
-    if (k === 'CC') cc++;
-    else if (k === 'MV') mv++;
-  }
-  return { cc, mv };
-}
-
-function countEthiopianSalesByContract(details: EnrichedProspectDetail[]): { cc: number; mv: number } {
-  let cc = 0;
-  let mv = 0;
-  for (const p of details) {
-    if (!p.isEthiopianPassportRenewalProspect || !p.convertedServices.includes('Ethiopian PP')) continue;
-    const k = contractKind(p.contractType);
-    if (k === 'CC') cc++;
-    else if (k === 'MV') mv++;
-  }
-  return { cc, mv };
-}
-
-const TRAVEL_SALES_ORDER: { key: string; aliases: string[] }[] = [
-  { key: 'Visa Lebanon', aliases: ['lebanon'] },
-  { key: 'Visa Egypt', aliases: ['egypt'] },
-  { key: 'Visa Jordan', aliases: ['jordan'] },
-  {
-    key: 'Visa Schengen',
-    aliases: [
-      'schengen',
-      'turkey',
-      'türkiye',
-      'turkiye',
-      'golden visa',
-      'golden',
-      'family visa',
-      'family',
-      'gcc',
-      'g.c.c',
-      'gulf',
-    ],
-  },
-];
-
-function countTravelSalesByContract(
-  details: EnrichedProspectDetail[]
-): Record<string, { cc: number; mv: number }> {
-  const out: Record<string, { cc: number; mv: number }> = {
-    'Visa Lebanon': { cc: 0, mv: 0 },
-    'Visa Egypt': { cc: 0, mv: 0 },
-    'Visa Jordan': { cc: 0, mv: 0 },
-    'Visa Schengen': { cc: 0, mv: 0 },
-  };
-
-  const allocated = new Set<string>();
-  for (const p of details) {
-    if (!p.isTravelVisaProspect || !prospectHasTravelConversion(p)) continue;
-    const key = prospectDedupeKey(p);
-    if (allocated.has(key)) continue;
-
-    for (const { key: rowKey, aliases } of TRAVEL_SALES_ORDER) {
-      if (prospectCountriesMatch(p, aliases)) {
-        const k = contractKind(p.contractType);
-        if (k === 'CC') out[rowKey].cc++;
-        else if (k === 'MV') out[rowKey].mv++;
-        allocated.add(key);
-        break;
-      }
-    }
-  }
-
-  return out;
-}
-
-/** Service overview — prospect CC/MV from dashboard; sales CC/MV from complaint conversions */
+/** Service overview — prospect CC/MV from dashboard; sales CC/MV = unique conversions by household contract (aligned with dashboard). */
 export function buildServiceOverviewRows(
   byContractType: ByContractType,
   countryCountsByContractType: { MV: Record<string, number>; CC: Record<string, number> },
-  details: EnrichedProspectDetail[]
+  emailSalesCcMv: EmailSalesCcMvSplit
 ): ServiceOverviewRow[] {
   const mv = countryCountsByContractType.MV;
   const cc = countryCountsByContractType.CC;
@@ -204,11 +99,11 @@ export function buildServiceOverviewRows(
   const pSchengenMv = countryCountsMatching(mv, schengenProspectMatchers);
   const pSchengenCc = countryCountsMatching(cc, schengenProspectMatchers);
 
-  const travelSales = countTravelSalesByContract(details);
-  const oecSales = countOecSalesByContract(details);
-  const owwaSales = countOwwaSalesByContract(details);
-  const filSales = countFilipinaSalesByContract(details);
-  const ethSales = countEthiopianSalesByContract(details);
+  const travelSales = emailSalesCcMv.travel;
+  const oecSales = emailSalesCcMv.oec;
+  const owwaSales = emailSalesCcMv.owwa;
+  const filSales = emailSalesCcMv.filipinaPassportRenewal;
+  const ethSales = emailSalesCcMv.ethiopianPassportRenewal;
 
   return [
     serviceOverviewRow(
