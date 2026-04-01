@@ -127,7 +127,8 @@ export async function GET(request: NextRequest) {
       delivery,
       summary: {
         totalProspects: report.prospects.total,
-        totalSales: report.sales.total,
+        totalSales: report.prospects.totalSales,
+        totalConversionRate: report.prospects.totalConversionRate,
         frustrationPercent: report.chatAnalysis.frustrationPercent,
         averageResponseTime: report.chatAnalysis.averageResponseTime,
       },

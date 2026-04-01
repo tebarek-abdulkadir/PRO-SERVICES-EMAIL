@@ -1,14 +1,15 @@
 import { getDailyChatAnalysisData, getDailyDelayTimeData } from '@/lib/chat-storage';
 import {
-  buildProspectsEmailRows,
-  buildSalesEmailRows,
+  buildServiceOverviewRows,
+  formatServiceConversionRate,
+  serviceOverviewProspectTotal,
+  serviceOverviewSalesTotal,
   shortDateColumnLabel,
-  tableRowsTotal,
-  type EmailReportTableRow,
+  type ServiceOverviewRow,
 } from '@/lib/email-report-layout';
 import type { EnrichedProspectDetail } from '@/lib/prospects-report';
 import { getDashboardProspectsData } from '@/lib/prospects-report';
-import type { Prospects } from '@/lib/types';
+import type { ByContractType, Prospects } from '@/lib/types';
 
 const REPORT_TIMEZONE = process.env.REPORT_TIMEZONE || 'Asia/Dubai';
 
@@ -20,10 +21,12 @@ interface DatePayload {
     details?: EnrichedProspectDetail[];
   };
   countryCounts?: Record<string, number>;
+  countryCountsByContractType?: { MV: Record<string, number>; CC: Record<string, number> };
+  byContractType?: ByContractType;
   prospectDetails?: EnrichedProspectDetail[];
 }
 
-export type { EmailReportTableRow };
+export type { ServiceOverviewRow };
 
 export interface DailyEmailReportData {
   date: string;
@@ -32,20 +35,24 @@ export interface DailyEmailReportData {
   timezone: string;
   generatedAt: string;
   prospects: {
-    rows: EmailReportTableRow[];
+    rows: ServiceOverviewRow[];
+    /** Sum of prospect CC + MV across rows */
     total: number;
+    /** Sum of sales CC + MV across rows */
+    totalSales: number;
+    /** Overall conversion: total sales / total prospects */
+    totalConversionRate: string;
     totalProcessed: number;
     totalConversations: number;
-  };
-  sales: {
-    rows: EmailReportTableRow[];
-    total: number;
   };
   chatAnalysis: {
     available: boolean;
     averageResponseTime: string | null;
     frustrationPercent: number;
     confusionPercent: number;
+    totalChats: number;
+    frustratedCount: number;
+    confusedCount: number;
   };
 }
 
@@ -75,60 +82,47 @@ async function loadDatePayload(date: string): Promise<DatePayload> {
     totalConversations: d.totalConversations,
     prospects: d.prospects,
     countryCounts: d.countryCounts,
+    countryCountsByContractType: d.countryCountsByContractType,
+    byContractType: d.byContractType,
     prospectDetails: d.prospectDetails,
   };
 }
 
 async function getProspectsAndSalesBlock(
   date: string
-): Promise<Pick<DailyEmailReportData, 'prospects' | 'sales' | 'columnLabelShort'>> {
+): Promise<Pick<DailyEmailReportData, 'prospects' | 'columnLabelShort'>> {
   const data = await loadDatePayload(date);
   const details =
     (data.prospects.details as EnrichedProspectDetail[] | undefined) ||
     data.prospectDetails ||
     [];
-  const countryCounts = data.countryCounts || {};
+  const countryCountsByContractType = data.countryCountsByContractType || { MV: {}, CC: {} };
+  const byContractType = data.byContractType;
+  if (!byContractType) {
+    throw new Error('Missing byContractType for email report; ensure dashboard data includes MV/CC breakdown.');
+  }
 
-  const prospectRows = buildProspectsEmailRows(data.prospects, countryCounts);
-  const salesRows = buildSalesEmailRows(
-    details.map((d) => ({
-      ...d,
-      convertedServices: d.convertedServices || [],
-    }))
-  );
+  const enriched = details.map((d) => ({
+    ...d,
+    convertedServices: d.convertedServices || [],
+  }));
+
+  const rows = buildServiceOverviewRows(byContractType, countryCountsByContractType, enriched);
+  const totalProspects = serviceOverviewProspectTotal(rows);
+  const totalSalesCount = serviceOverviewSalesTotal(rows);
 
   const columnLabelShort = shortDateColumnLabel(date, REPORT_TIMEZONE);
 
   return {
     columnLabelShort,
     prospects: {
-      rows: prospectRows,
-      total: tableRowsTotal(prospectRows),
+      rows,
+      total: totalProspects,
+      totalSales: totalSalesCount,
+      totalConversionRate: formatServiceConversionRate(totalProspects, totalSalesCount),
       totalProcessed: data.totalProcessed || 0,
       totalConversations: data.totalConversations || 0,
     },
-    sales: {
-      rows: salesRows,
-      total: tableRowsTotal(salesRows),
-    },
-  };
-}
-
-async function getChatAnalysisMetrics(
-  date: string
-): Promise<Pick<DailyEmailReportData['chatAnalysis'], 'available' | 'frustrationPercent' | 'confusionPercent'>> {
-  const data = await getDailyChatAnalysisData(date);
-
-  if (!data) {
-    throw new Error(`No chat analysis data available for ${date}`);
-  }
-
-  const m = data.overallMetrics;
-
-  return {
-    available: true,
-    frustrationPercent: m.frustrationPercentage || 0,
-    confusionPercent: m.confusionPercentage || 0,
   };
 }
 
@@ -138,11 +132,17 @@ async function getAverageResponseTime(date: string): Promise<string | null> {
 }
 
 export async function getDailyEmailReportData(date: string): Promise<DailyEmailReportData> {
-  const [block, chatMetrics, averageResponseTime] = await Promise.all([
+  const [block, chatData, averageResponseTime] = await Promise.all([
     getProspectsAndSalesBlock(date),
-    getChatAnalysisMetrics(date),
+    getDailyChatAnalysisData(date),
     getAverageResponseTime(date),
   ]);
+
+  if (!chatData) {
+    throw new Error(`No chat analysis data available for ${date}`);
+  }
+
+  const m = chatData.overallMetrics;
 
   return {
     date,
@@ -151,12 +151,14 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
     timezone: REPORT_TIMEZONE,
     generatedAt: new Date().toISOString(),
     prospects: block.prospects,
-    sales: block.sales,
     chatAnalysis: {
-      available: chatMetrics.available,
+      available: true,
       averageResponseTime,
-      frustrationPercent: chatMetrics.frustrationPercent,
-      confusionPercent: chatMetrics.confusionPercent,
+      frustrationPercent: m.frustrationPercentage || 0,
+      confusionPercent: m.confusionPercentage || 0,
+      totalChats: m.totalConversations || 0,
+      frustratedCount: m.frustratedCount || 0,
+      confusedCount: m.confusedCount || 0,
     },
   };
 }

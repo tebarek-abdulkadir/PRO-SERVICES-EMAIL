@@ -30,6 +30,8 @@ export interface DashboardProspectsData {
   };
   conversions: Conversions;
   countryCounts: Record<string, number>;
+  /** Travel-visa country counts split by household contract type (MV vs CC), same rules as `countryCounts` */
+  countryCountsByContractType: { MV: Record<string, number>; CC: Record<string, number> };
   byContractType: ByContractType;
   latestRun: Awaited<ReturnType<typeof getLatestRun>>;
   households: StoredHouseholdGroup[];
@@ -352,6 +354,11 @@ export async function getDashboardProspectsData(date: string): Promise<Dashboard
   }
 
   const countryCounts: Record<string, number> = {};
+  const countryCountsByContractType: { MV: Record<string, number>; CC: Record<string, number> } = {
+    MV: {},
+    CC: {},
+  };
+
   for (const [, members] of householdMap) {
     const hasTravelVisa = members.some((member) => member.isTravelVisaProspect);
 
@@ -375,6 +382,16 @@ export async function getDashboardProspectsData(date: string): Promise<Dashboard
     for (const country of householdCountries) {
       countryCounts[country] = (countryCounts[country] || 0) + 1;
     }
+
+    const contractType = members.find((member) => member.contractType)?.contractType || '';
+    if (contractType !== 'CC' && contractType !== 'MV') {
+      continue;
+    }
+
+    const bucket = contractType === 'CC' ? countryCountsByContractType.CC : countryCountsByContractType.MV;
+    for (const country of householdCountries) {
+      bucket[country] = (bucket[country] || 0) + 1;
+    }
   }
 
   return {
@@ -389,6 +406,7 @@ export async function getDashboardProspectsData(date: string): Promise<Dashboard
     },
     conversions,
     countryCounts,
+    countryCountsByContractType,
     byContractType,
     latestRun,
     households,
