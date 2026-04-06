@@ -204,7 +204,8 @@ export function resolveReportDate(searchParams: URLSearchParams, now = new Date(
     return overrideDate;
   }
 
-  return getPreviousDate(getDateInTimeZone(now, REPORT_TIMEZONE));
+  // Same calendar day in REPORT_TIMEZONE (cron has no ?date= override)
+  return getDateInTimeZone(now, REPORT_TIMEZONE);
 }
 
 export function isDryRun(searchParams: URLSearchParams): boolean {
