@@ -77,19 +77,22 @@ SMTP_USER=
 SMTP_PASSWORD=
 SMTP_FROM_EMAIL=
 SMTP_USE_TLS=true
-DAILY_REPORT_RECIPIENTS=sahar.sabbagh@maids.cc
+DAILY_REPORT_RECIPIENTS=sahar.sabbagh@maids.cc,teammate@maids.cc
 CRON_SECRET=
 REPORT_DATE_TIMEZONE=Africa/Nairobi
 ```
+
+Use a **comma-separated** list in `DAILY_REPORT_RECIPIENTS` for multiple people. The mailer does **not** use BCC: by default (**`DAILY_REPORT_ADDRESSING=to_all`**, or unset) every address is on the **To** line so each person sees the full recipient list. To use **To** + **Cc** instead (first address To, the rest Cc), set `DAILY_REPORT_ADDRESSING=to_and_cc`.
 
 Optional:
 
 ```bash
 APP_BASE_URL=
 REPORT_DATE_TIMEZONE=Asia/Dubai
+DAILY_REPORT_ADDRESSING=to_all
 ```
 
-`APP_BASE_URL` is optional: the cron response JSON includes an `origin` field for debugging; report data is read directly from storage (no internal HTTP to `/api/dates`).
+`APP_BASE_URL` is optional: the cron response JSON includes an `origin` field for debugging; report data is read directly from storage (no internal HTTP to `/api/dates`). A **`dryRun=true`** cron response also returns the resolved **`recipients`** array so you can confirm who would receive the send without mailing.
 
 ### Manual testing
 

@@ -39,6 +39,15 @@ function splitRecipients(value: string): string[] {
     .filter(Boolean);
 }
 
+/** How to address multiple recipients so everyone can see who got the report (not BCC). */
+function recipientAddressingMode(): 'to_all' | 'to_and_cc' {
+  const raw = (process.env.DAILY_REPORT_ADDRESSING || 'to_all').toLowerCase().trim();
+  if (raw === 'to_and_cc' || raw === 'cc') {
+    return 'to_and_cc';
+  }
+  return 'to_all';
+}
+
 export interface SendSmtpEmailInput {
   to?: string[];
   subject: string;
@@ -108,9 +117,24 @@ export async function sendSmtpEmail({
     },
   });
 
+  const mode = recipientAddressingMode();
+  let mailTo: string | string[];
+  let mailCc: string | undefined;
+
+  if (recipients.length <= 1) {
+    mailTo = recipients[0] || DEFAULT_RECIPIENT;
+  } else if (mode === 'to_and_cc') {
+    mailTo = recipients[0];
+    mailCc = recipients.slice(1).join(', ');
+  } else {
+    // Default: every address in To — all clients show the full list (transparent, not BCC)
+    mailTo = recipients;
+  }
+
   const info = await transporter.sendMail({
     from,
-    to: recipients.join(', '),
+    to: mailTo,
+    cc: mailCc,
     subject,
     html,
     text,
