@@ -62,9 +62,9 @@ Ops data is intentionally excluded from this email.
 
 ### Schedule
 
-`vercel.json` schedules the route to run daily at `8 20 * * *` UTC, which is **11:08 PM** East Africa Time (`Africa/Nairobi`, UTC+3, no DST).
+`vercel.json` schedules the route to run daily at `15 20 * * *` UTC, which is **11:15 PM** East Africa Time (`Africa/Nairobi`, UTC+3, no DST).
 
-By default, the route reports the **same** calendar day as “now” in `REPORT_TIMEZONE` (default `Asia/Dubai`). Override with the `date` query parameter (`YYYY-MM-DD`) if needed.
+The report **date** (which day’s blob data to load) is **“today” in `REPORT_DATE_TIMEZONE`** (default `Africa/Nairobi`), so a late-evening EAT cron does not jump ahead to the next calendar day the way `Asia/Dubai` (UTC+4) would. Set `REPORT_DATE_TIMEZONE=Asia/Dubai` only if you intentionally want the business day in Dubai. Override any time with `?date=YYYY-MM-DD`.
 
 ### Required environment variables
 
@@ -79,13 +79,14 @@ SMTP_FROM_EMAIL=
 SMTP_USE_TLS=true
 DAILY_REPORT_RECIPIENTS=sahar.sabbagh@maids.cc
 CRON_SECRET=
-REPORT_TIMEZONE=Asia/Dubai
+REPORT_DATE_TIMEZONE=Africa/Nairobi
 ```
 
 Optional:
 
 ```bash
 APP_BASE_URL=
+REPORT_DATE_TIMEZONE=Asia/Dubai
 ```
 
 `APP_BASE_URL` is optional: the cron response JSON includes an `origin` field for debugging; report data is read directly from storage (no internal HTTP to `/api/dates`).

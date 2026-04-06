@@ -12,7 +12,8 @@ import type { EmailSalesCcMvSplit, EnrichedProspectDetail } from '@/lib/prospect
 import { getDashboardProspectsData } from '@/lib/prospects-report';
 import type { ByContractType, Prospects } from '@/lib/types';
 
-const REPORT_TIMEZONE = process.env.REPORT_TIMEZONE || 'Asia/Dubai';
+/** Calendar day for automated report + email labels; default EAT so it matches cron scheduled in East Africa (Dubai is UTC+4 and can already be “tomorrow” when Nairobi is still “today”). */
+const REPORT_DATE_TIMEZONE = process.env.REPORT_DATE_TIMEZONE || 'Africa/Nairobi';
 
 interface DatePayload {
   date: string;
@@ -112,7 +113,7 @@ async function getProspectsAndSalesBlock(
   const totalProspects = serviceOverviewProspectTotal(rows);
   const totalSalesCount = serviceOverviewSalesTotal(rows);
 
-  const columnLabelShort = shortDateColumnLabel(date, REPORT_TIMEZONE);
+  const columnLabelShort = shortDateColumnLabel(date, REPORT_DATE_TIMEZONE);
 
   return {
     columnLabelShort,
@@ -148,9 +149,9 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
 
   return {
     date,
-    displayDate: formatDisplayDate(date, REPORT_TIMEZONE),
+    displayDate: formatDisplayDate(date, REPORT_DATE_TIMEZONE),
     columnLabelShort: block.columnLabelShort,
-    timezone: REPORT_TIMEZONE,
+    timezone: REPORT_DATE_TIMEZONE,
     generatedAt: new Date().toISOString(),
     prospects: block.prospects,
     chatAnalysis: {
@@ -204,8 +205,8 @@ export function resolveReportDate(searchParams: URLSearchParams, now = new Date(
     return overrideDate;
   }
 
-  // Same calendar day in REPORT_TIMEZONE (cron has no ?date= override)
-  return getDateInTimeZone(now, REPORT_TIMEZONE);
+  // Same calendar day in East Africa (or REPORT_DATE_TIMEZONE) — aligns with EAT cron
+  return getDateInTimeZone(now, REPORT_DATE_TIMEZONE);
 }
 
 export function isDryRun(searchParams: URLSearchParams): boolean {
@@ -213,5 +214,10 @@ export function isDryRun(searchParams: URLSearchParams): boolean {
 }
 
 export function getReportTimezone(): string {
-  return REPORT_TIMEZONE;
+  return REPORT_DATE_TIMEZONE;
+}
+
+/** Timezone used to pick and label the report calendar day (default `Africa/Nairobi`). */
+export function getReportDateTimezone(): string {
+  return REPORT_DATE_TIMEZONE;
 }
