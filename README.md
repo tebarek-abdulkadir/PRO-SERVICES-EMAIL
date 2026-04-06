@@ -62,7 +62,7 @@ Ops data is intentionally excluded from this email.
 
 ### Schedule
 
-`vercel.json` schedules the route to run daily at `0 17 * * *` UTC, which is **7:00 PM** in Lebanon when `Asia/Beirut` is on standard time (**EET, UTC+2**). During daylight saving (**EEST, UTC+3**), the same UTC run is **8:00 PM** Beirut (Vercel crons are fixed UTC).
+`vercel.json` schedules the route to run daily at `55 19 * * *` UTC, which is **10:55 PM** East Africa Time (`Africa/Nairobi`, UTC+3, no DST).
 
 By default, the route reports the previous calendar day in Dubai time. You can override the date manually with the `date` query parameter.
 
