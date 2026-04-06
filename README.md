@@ -62,7 +62,7 @@ Ops data is intentionally excluded from this email.
 
 ### Schedule
 
-`vercel.json` schedules the route to run daily at `15 20 * * *` UTC, which is **11:15 PM** East Africa Time (`Africa/Nairobi`, UTC+3, no DST).
+`vercel.json` schedules the route to run daily at `0 16 * * *` UTC, which is **7:00 PM** East Africa Time (`Africa/Nairobi`, UTC+3, no DST).
 
 The report **date** (which day’s blob data to load) is **“today” in `REPORT_DATE_TIMEZONE`** (default `Africa/Nairobi`), so a late-evening EAT cron does not jump ahead to the next calendar day the way `Asia/Dubai` (UTC+4) would. Set `REPORT_DATE_TIMEZONE=Asia/Dubai` only if you intentionally want the business day in Dubai. Override any time with `?date=YYYY-MM-DD`.
 
