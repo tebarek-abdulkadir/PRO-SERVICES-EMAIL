@@ -62,7 +62,7 @@ Ops data is intentionally excluded from this email.
 
 ### Schedule
 
-`vercel.json` schedules the route to run daily at `2 20 * * *` UTC, which is **11:02 PM** East Africa Time (`Africa/Nairobi`, UTC+3, no DST).
+`vercel.json` schedules the route to run daily at `8 20 * * *` UTC, which is **11:08 PM** East Africa Time (`Africa/Nairobi`, UTC+3, no DST).
 
 By default, the route reports the **same** calendar day as “now” in `REPORT_TIMEZONE` (default `Asia/Dubai`). Override with the `date` query parameter (`YYYY-MM-DD`) if needed.
 
