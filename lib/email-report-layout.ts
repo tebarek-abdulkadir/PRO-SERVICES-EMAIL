@@ -44,6 +44,18 @@ export interface ServiceOverviewRow {
   lmConversionRate: string;
 }
 
+/** Canonical order for the eight service-overview products (matches `buildServiceOverviewRows`). */
+export const SERVICE_OVERVIEW_PRODUCT_LABELS: readonly string[] = [
+  'OEC',
+  'OWWA',
+  'Visa Lebanon',
+  'Visa Egypt',
+  'Visa Jordan',
+  'Visa Schengen',
+  'Passport Filipina',
+  'Passport Ethiopian',
+];
+
 function normalizeCountryToken(s: string): string {
   return s.trim().toLowerCase();
 }

@@ -1,5 +1,5 @@
 import { getDailyChatAnalysisData } from '@/lib/chat-storage';
-import type { ServiceOverviewRow } from '@/lib/email-report-layout';
+import { SERVICE_OVERVIEW_PRODUCT_LABELS, type ServiceOverviewRow } from '@/lib/email-report-layout';
 import { tryLoadServiceOverviewForDate } from '@/lib/email-report-periods';
 
 /** Same as dashboard email: sales / prospects × 100 for that product/day. */
@@ -42,13 +42,7 @@ export async function loadEmailTrendSeries(dates: string[]): Promise<{
     })
   );
 
-  let labels: string[] = [];
-  for (const s of snapshots) {
-    if (s.rows?.length) {
-      labels = s.rows.map((r) => r.label);
-      break;
-    }
-  }
+  const labels: string[] = [...SERVICE_OVERVIEW_PRODUCT_LABELS];
 
   const conversionRatePctByLabel = new Map<string, (number | null)[]>();
   for (const lb of labels) {

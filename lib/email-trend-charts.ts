@@ -89,13 +89,15 @@ export function renderConversionTrendSvg(
 ): string {
   const W = 640;
   const H = 500;
+  /** Title only (no subtitle); tighter top than chat chart. */
+  const plotTop = 52;
   const padL = 56;
   const padR = 14;
   const padB = X_AXIS_PAD + 8;
   const legendRows = Math.ceil(series.length / 2);
   const legendH = Math.max(76, legendRows * 24 + 12);
   const plotW = W - padL - padR;
-  const plotH = H - PLOT_TOP - padB - legendH;
+  const plotH = H - plotTop - padB - legendH;
   const n = dates.length;
 
   if (n === 0 || series.length === 0) {
@@ -105,12 +107,12 @@ export function renderConversionTrendSvg(
   }
 
   const xAt = (i: number) => padL + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW);
-  const yAt = (v: number) => PLOT_TOP + plotH - (yPercentScale(v) / Y_PERCENT_MAX) * plotH;
+  const yAt = (v: number) => plotTop + plotH - (yPercentScale(v) / Y_PERCENT_MAX) * plotH;
 
   const gridLines: string[] = [];
   const yLabels: string[] = [];
   for (let p = 0; p <= Y_PERCENT_MAX; p += 5) {
-    const y = PLOT_TOP + plotH - (p / Y_PERCENT_MAX) * plotH;
+    const y = plotTop + plotH - (p / Y_PERCENT_MAX) * plotH;
     gridLines.push(
       `<line x1="${padL}" y1="${y}" x2="${padL + plotW}" y2="${y}" stroke="#dddddd" stroke-width="1"/>`
     );
@@ -124,7 +126,7 @@ export function renderConversionTrendSvg(
   for (let i = 0; i < n; i += xstep) {
     const lab = longDateLabel(dates[i]);
     xLabels.push(
-      `<text x="${xAt(i)}" y="${PLOT_TOP + plotH + 16}" text-anchor="middle" font-size="9" fill="${MUTED}" font-family="${FONT}">${esc(lab)}</text>`
+      `<text x="${xAt(i)}" y="${plotTop + plotH + 16}" text-anchor="middle" font-size="9" fill="${MUTED}" font-family="${FONT}">${esc(lab)}</text>`
     );
   }
 
@@ -139,40 +141,29 @@ export function renderConversionTrendSvg(
     }
   });
 
-  /**
-   * Per date: stack all conversion % in a fixed band between the 100% and 50% grid lines,
-   * highest value at the top. Color matches the line (legend); no labels on the lines themselves.
-   */
+  /** One row per product (canonical order): 100%–50% band; first date nudged right of Y-axis labels. */
+  const FIRST_DATE_STACK_NUDGE = 20;
   const conversionColumnLabels: string[] = [];
   const bandTopPx = yAt(100) + 4;
   const bandBottomPx = yAt(50) - 4;
+  const spanPx = bandBottomPx - bandTopPx;
+  const slotH = spanPx / series.length;
   for (let i = 0; i < n; i++) {
-    const entries: { value: number; idx: number }[] = [];
+    const colX = xAt(i) + (i === 0 ? FIRST_DATE_STACK_NUDGE : 0);
     series.forEach((s, idx) => {
       const v = s.values[i];
-      if (v !== null && v !== undefined && !Number.isNaN(v)) {
-        entries.push({ value: v, idx });
-      }
-    });
-    if (entries.length === 0) {
-      continue;
-    }
-    entries.sort((a, b) => b.value - a.value);
-    const k = entries.length;
-    const spanPx = bandBottomPx - bandTopPx;
-    const slotH = spanPx / k;
-    const cx = xAt(i);
-    entries.forEach((e, j) => {
-      const yCenter = bandTopPx + (j + 0.5) * slotH;
-      const color = PRODUCT_COLORS[e.idx % PRODUCT_COLORS.length];
-      const yBaseline = yCenter + 3;
+      const yBaseline = bandTopPx + (idx + 0.5) * slotH + 3;
+      const color = PRODUCT_COLORS[idx % PRODUCT_COLORS.length];
+      const hasVal = typeof v === 'number' && !Number.isNaN(v);
+      const labelText = hasVal ? fmtPct(v) : '\u2014';
+      const fill = hasVal ? color : MUTED;
       conversionColumnLabels.push(
-        `<text x="${cx}" y="${yBaseline}" text-anchor="middle" font-size="8" font-weight="600" fill="${color}" font-family="${FONT}">${esc(fmtPct(e.value))}</text>`
+        `<text x="${colX}" y="${yBaseline}" text-anchor="middle" font-size="8" font-weight="600" fill="${fill}" font-family="${FONT}">${esc(labelText)}</text>`
       );
     });
   }
 
-  const legendY = PLOT_TOP + plotH + 36;
+  const legendY = plotTop + plotH + 36;
   const legendItems = series.map((s, idx) => {
     const col = idx % 2;
     const row = Math.floor(idx / 2);
@@ -188,9 +179,8 @@ export function renderConversionTrendSvg(
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}">
   <rect width="100%" height="100%" fill="#fafafa"/>
   <text x="${W / 2}" y="${TITLE_Y}" text-anchor="middle" font-size="14" font-weight="700" fill="${TEXT_FILL}" font-family="${FONT}">${esc(title)}</text>
-  <text x="${W / 2}" y="${SUBTITLE_Y}" text-anchor="middle" font-size="10" fill="${MUTED}" font-family="${FONT}">${esc('Per-date % stacked between 100% and 50% (high→low); colors match lines. Y axis every 5%.')}</text>
-  <line x1="${padL}" y1="${PLOT_TOP + plotH}" x2="${padL + plotW}" y2="${PLOT_TOP + plotH}" stroke="#888888" stroke-width="1"/>
-  <line x1="${padL}" y1="${PLOT_TOP}" x2="${padL}" y2="${PLOT_TOP + plotH}" stroke="#888888" stroke-width="1"/>
+  <line x1="${padL}" y1="${plotTop + plotH}" x2="${padL + plotW}" y2="${plotTop + plotH}" stroke="#888888" stroke-width="1"/>
+  <line x1="${padL}" y1="${plotTop}" x2="${padL}" y2="${plotTop + plotH}" stroke="#888888" stroke-width="1"/>
   ${gridLines.join('\n  ')}
   ${yLabels.join('\n  ')}
   ${paths.join('\n  ')}
