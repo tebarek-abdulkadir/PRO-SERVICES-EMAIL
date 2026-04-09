@@ -32,6 +32,15 @@ function smtpFrom(): string {
   return process.env.SMTP_FROM_EMAIL || process.env.SMTP_EMAIL || smtpUser();
 }
 
+/** Angle-bracket form required by RFC 5322 for In-Reply-To / References */
+function normalizeMessageId(value: string): string {
+  const t = value.trim();
+  if (t.startsWith('<') && t.endsWith('>')) {
+    return t;
+  }
+  return `<${t}>`;
+}
+
 function splitRecipients(value: string): string[] {
   return value
     .split(',')
@@ -131,6 +140,15 @@ export async function sendSmtpEmail({
     mailTo = recipients;
   }
 
+  const threadRoot = process.env.DAILY_EMAIL_THREAD_ROOT_MESSAGE_ID?.trim();
+  const threadHeaders =
+    threadRoot !== undefined && threadRoot.length > 0
+      ? {
+          'In-Reply-To': normalizeMessageId(threadRoot),
+          References: normalizeMessageId(threadRoot),
+        }
+      : undefined;
+
   const info = await transporter.sendMail({
     from,
     to: mailTo,
@@ -138,6 +156,7 @@ export async function sendSmtpEmail({
     subject,
     html,
     text,
+    ...(threadHeaders ? { headers: threadHeaders } : {}),
   });
 
   return {

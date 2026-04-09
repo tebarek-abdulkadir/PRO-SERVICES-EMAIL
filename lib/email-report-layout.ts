@@ -36,9 +36,11 @@ export interface ServiceOverviewRow {
   conversionRate: string;
   /** Sales MTD total / prospect MTD total */
   conversionRateMtd: string;
-  /** Last calendar month: avg daily (CC+MV) prospects for this service */
-  lmProspectDailyAvg: number;
-  lmSalesDailyAvg: number;
+  /** Last calendar month: avg daily prospects CC per day (days with data) */
+  lmProspectDailyAvgCc: number;
+  lmProspectDailyAvgMv: number;
+  lmSalesDailyAvgCc: number;
+  lmSalesDailyAvgMv: number;
   lmConversionRate: string;
 }
 
@@ -98,8 +100,10 @@ function serviceOverviewRow(
     salesMtdAvgMv: 0,
     conversionRate: formatServiceConversionRate(pt, st),
     conversionRateMtd: '0%',
-    lmProspectDailyAvg: 0,
-    lmSalesDailyAvg: 0,
+    lmProspectDailyAvgCc: 0,
+    lmProspectDailyAvgMv: 0,
+    lmSalesDailyAvgCc: 0,
+    lmSalesDailyAvgMv: 0,
     lmConversionRate: '0%',
   };
 }

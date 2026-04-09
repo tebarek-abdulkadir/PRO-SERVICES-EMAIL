@@ -70,6 +70,9 @@ export interface DailyEmailReportData {
     frustrationPercentMtdAvg: number;
     confusionPercentMtdAvg: number;
     chatMtdDaysCounted: number;
+    frustrationPercentLmAvg: number;
+    confusionPercentLmAvg: number;
+    chatLmDaysCounted: number;
     totalChats: number;
     /** Unique people with frustration (same as Chats page “Frustrated People”) */
     frustratedClients: number;
@@ -168,11 +171,13 @@ async function getAverageResponseTime(date: string): Promise<string | null> {
 
 export async function getDailyEmailReportData(date: string): Promise<DailyEmailReportData> {
   const mtdDates = mtdDateRange(date);
-  const [block, chatData, averageResponseTime, chatMtd] = await Promise.all([
+  const lmChatDates = lastMonthDateRange(date);
+  const [block, chatData, averageResponseTime, chatMtd, chatLm] = await Promise.all([
     getProspectsAndSalesBlock(date),
     getDailyChatAnalysisData(date),
     getAverageResponseTime(date),
     averageChatRatesForDateRange(mtdDates),
+    averageChatRatesForDateRange(lmChatDates),
   ]);
 
   if (!chatData) {
@@ -197,6 +202,9 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
       frustrationPercentMtdAvg: chatMtd.frustrationPercentMtdAvg,
       confusionPercentMtdAvg: chatMtd.confusionPercentMtdAvg,
       chatMtdDaysCounted: chatMtd.chatMtdDaysCounted,
+      frustrationPercentLmAvg: chatLm.frustrationPercentMtdAvg,
+      confusionPercentLmAvg: chatLm.confusionPercentMtdAvg,
+      chatLmDaysCounted: chatLm.chatMtdDaysCounted,
       totalChats: chatTable.totalChats,
       frustratedClients: chatTable.frustratedClients,
       frustratedChats: chatTable.frustratedChats,

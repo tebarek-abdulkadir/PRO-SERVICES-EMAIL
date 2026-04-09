@@ -1,8 +1,6 @@
 import {
   buildServiceOverviewRows,
   formatServiceConversionRate,
-  serviceOverviewProspectTotal,
-  serviceOverviewSalesTotal,
   type ServiceOverviewRow,
 } from '@/lib/email-report-layout';
 import { getDashboardProspectsData } from '@/lib/prospects-report';
@@ -157,8 +155,10 @@ export function applyPeriodAggregatesToRows(
       salesMtdCc + salesMtdMv
     );
 
-    const lmProspectDailyAvg = lmN ? Math.round(((l.pcc + l.pmv) / lmN) * 10) / 10 : 0;
-    const lmSalesDailyAvg = lmN ? Math.round(((l.scc + l.smv) / lmN) * 10) / 10 : 0;
+    const lmProspectDailyAvgCc = fmtAvg(l.pcc, lmN);
+    const lmProspectDailyAvgMv = fmtAvg(l.pmv, lmN);
+    const lmSalesDailyAvgCc = fmtAvg(l.scc, lmN);
+    const lmSalesDailyAvgMv = fmtAvg(l.smv, lmN);
     const lmConversionRate = formatServiceConversionRate(l.pcc + l.pmv, l.scc + l.smv);
 
     return {
@@ -172,8 +172,10 @@ export function applyPeriodAggregatesToRows(
       salesMtdAvgCc,
       salesMtdAvgMv,
       conversionRateMtd,
-      lmProspectDailyAvg,
-      lmSalesDailyAvg,
+      lmProspectDailyAvgCc,
+      lmProspectDailyAvgMv,
+      lmSalesDailyAvgCc,
+      lmSalesDailyAvgMv,
       lmConversionRate,
     };
   });
@@ -220,15 +222,35 @@ export function computeExtendedTotalsRow(
 
   let lmProsSum = 0;
   let lmSalSum = 0;
+  let sumLmDayPcc = 0;
+  let sumLmDayPmv = 0;
+  let sumLmDayScc = 0;
+  let sumLmDaySmv = 0;
   if (lmSnapshots.length > 0) {
     for (const snap of lmSnapshots) {
-      lmProsSum += serviceOverviewProspectTotal(snap);
-      lmSalSum += serviceOverviewSalesTotal(snap);
+      let dayPcc = 0;
+      let dayPmv = 0;
+      let dayScc = 0;
+      let daySmv = 0;
+      for (const r of snap) {
+        dayPcc += r.prospectCc;
+        dayPmv += r.prospectMv;
+        dayScc += r.salesCc;
+        daySmv += r.salesMv;
+      }
+      sumLmDayPcc += dayPcc;
+      sumLmDayPmv += dayPmv;
+      sumLmDayScc += dayScc;
+      sumLmDaySmv += daySmv;
+      lmProsSum += dayPcc + dayPmv;
+      lmSalSum += dayScc + daySmv;
     }
   }
   const lmN = lmSnapshots.length;
-  const lmProspectDailyAvg = lmN ? Math.round((lmProsSum / lmN) * 10) / 10 : 0;
-  const lmSalesDailyAvg = lmN ? Math.round((lmSalSum / lmN) * 10) / 10 : 0;
+  const lmProspectDailyAvgCc = fmtAvg(sumLmDayPcc, lmN);
+  const lmProspectDailyAvgMv = fmtAvg(sumLmDayPmv, lmN);
+  const lmSalesDailyAvgCc = fmtAvg(sumLmDayScc, lmN);
+  const lmSalesDailyAvgMv = fmtAvg(sumLmDaySmv, lmN);
   const lmConversionRate = formatServiceConversionRate(lmProsSum, lmSalSum);
 
   return {
@@ -247,8 +269,10 @@ export function computeExtendedTotalsRow(
     salesMtdAvgMv,
     conversionRate,
     conversionRateMtd,
-    lmProspectDailyAvg,
-    lmSalesDailyAvg,
+    lmProspectDailyAvgCc,
+    lmProspectDailyAvgMv,
+    lmSalesDailyAvgCc,
+    lmSalesDailyAvgMv,
     lmConversionRate,
   };
 }

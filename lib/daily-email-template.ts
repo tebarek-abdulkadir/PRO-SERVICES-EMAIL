@@ -18,6 +18,9 @@ function formatPercent(value: number): string {
 /** Em dash — (missing / TBD data) */
 const EM = '&#8212;';
 
+/** Chatbot coverage metrics are not wired yet */
+const CHATBOT_UNDER_DEVELOPMENT = 'Under Development';
+
 const font = "Segoe UI,Calibri,sans-serif";
 const thStyle = `padding:8px 10px;background:#4472c4;color:#fff;font-size:11px;font-weight:600;text-align:center;border:1px solid #bdc3c7;font-family:${font}`;
 const thLeft = `padding:8px 10px;background:#4472c4;color:#fff;font-size:11px;font-weight:600;text-align:left;border:1px solid #bdc3c7;font-family:${font}`;
@@ -59,8 +62,10 @@ function serviceDataCells(row: ServiceOverviewRow, bold = false): string {
           <td style="${s}">${fmtAvgCell(row.salesMtdAvgMv)}</td>
           <td style="${s}">${escapeHtml(row.conversionRate)}</td>
           <td style="${s}">${escapeHtml(row.conversionRateMtd)}</td>
-          <td style="${s}">${fmtAvgCell(row.lmProspectDailyAvg)}</td>
-          <td style="${s}">${fmtAvgCell(row.lmSalesDailyAvg)}</td>
+          <td style="${s}">${fmtAvgCell(row.lmProspectDailyAvgCc)}</td>
+          <td style="${s}">${fmtAvgCell(row.lmProspectDailyAvgMv)}</td>
+          <td style="${s}">${fmtAvgCell(row.lmSalesDailyAvgCc)}</td>
+          <td style="${s}">${fmtAvgCell(row.lmSalesDailyAvgMv)}</td>
           <td style="${s}">${escapeHtml(row.lmConversionRate)}</td>`;
 }
 
@@ -77,29 +82,33 @@ function renderServiceOverviewTable(rows: ServiceOverviewRow[], totals: ServiceO
     .join('');
 
   return `
-    <table style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:1100px;margin:0 0 24px 0" cellspacing="0" cellpadding="0">
+    <table role="presentation" width="100%" style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:1100px;margin:0 0 24px 0;mso-table-lspace:0pt;mso-table-rspace:0pt;table-layout:auto;" cellspacing="0" cellpadding="0">
       <thead>
         <tr>
           <th style="${thLeft}" rowspan="3">Service Type</th>
           <th style="${thStyle}" colspan="6">Prospect</th>
           <th style="${thStyle}" colspan="6">Sales</th>
           <th style="${thStyle}" colspan="2">Conversion</th>
-          <th style="${thStyle}" colspan="3">LM (last month)</th>
+          <th style="${thStyle}" colspan="5">LM (last month)</th>
         </tr>
         <tr>
           <th style="${thStyle}" colspan="2">Daily</th>
           <th style="${thStyle}" colspan="2">MTD total</th>
-          <th style="${thStyle}" colspan="2">MTD avg</th>
+          <th style="${thStyle}" colspan="2">MTD Daily Avg</th>
           <th style="${thStyle}" colspan="2">Daily</th>
           <th style="${thStyle}" colspan="2">MTD total</th>
-          <th style="${thStyle}" colspan="2">MTD avg</th>
+          <th style="${thStyle}" colspan="2">MTD Daily Avg</th>
           <th style="${thStyle}" rowspan="2">Daily</th>
-          <th style="${thStyle}" rowspan="2">MTD avg</th>
-          <th style="${thStyle}" rowspan="2">Prospect daily avg</th>
-          <th style="${thStyle}" rowspan="2">Sales daily avg</th>
+          <th style="${thStyle}" rowspan="2">MTD Daily Avg</th>
+          <th style="${thStyle}" colspan="2">Prospect daily avg</th>
+          <th style="${thStyle}" colspan="2">Sales daily avg</th>
           <th style="${thStyle}" rowspan="2">Conv. rate</th>
         </tr>
         <tr>
+          <th style="${thStyle}">CC</th>
+          <th style="${thStyle}">MV</th>
+          <th style="${thStyle}">CC</th>
+          <th style="${thStyle}">MV</th>
           <th style="${thStyle}">CC</th>
           <th style="${thStyle}">MV</th>
           <th style="${thStyle}">CC</th>
@@ -167,7 +176,7 @@ function renderChatMetricsTable(report: DailyEmailReportData): string {
   const c = report.chatAnalysis;
 
   return `
-    <table style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:560px;margin:0 0 16px 0" cellspacing="0" cellpadding="0">
+    <table role="presentation" width="100%" style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:560px;margin:0 0 16px 0;mso-table-lspace:0pt;mso-table-rspace:0pt;" cellspacing="0" cellpadding="0">
       <thead>
         <tr>
           <th style="${thStyle}">Total Chats</th>
@@ -186,8 +195,8 @@ function renderChatMetricsTable(report: DailyEmailReportData): string {
           <td style="${tdBase};text-align:center">${c.frustratedChats}</td>
           <td style="${tdBase};text-align:center">${c.confusedClients}</td>
           <td style="${tdBase};text-align:center">${c.confusedChats}</td>
-          <td style="${tdBase};text-align:center">0</td>
-          <td style="${tdBase};text-align:center">0%</td>
+          <td style="${tdBase};text-align:center">${escapeHtml(CHATBOT_UNDER_DEVELOPMENT)}</td>
+          <td style="${tdBase};text-align:center">${escapeHtml(CHATBOT_UNDER_DEVELOPMENT)}</td>
         </tr>
       </tbody>
     </table>`;
@@ -197,17 +206,22 @@ function renderChatSummaryTable(report: DailyEmailReportData): string {
   const col = escapeHtml(report.columnLabelShort);
   const fr = escapeHtml(formatPercent(report.chatAnalysis.frustrationPercent));
   const frm = escapeHtml(formatPercent(report.chatAnalysis.frustrationPercentMtdAvg));
+  const frl = escapeHtml(formatPercent(report.chatAnalysis.frustrationPercentLmAvg));
   const cr = escapeHtml(formatPercent(report.chatAnalysis.confusionPercent));
   const crm = escapeHtml(formatPercent(report.chatAnalysis.confusionPercentMtdAvg));
+  const crl = escapeHtml(formatPercent(report.chatAnalysis.confusionPercentLmAvg));
   const mtdN = report.chatAnalysis.chatMtdDaysCounted;
+  const lmN = report.chatAnalysis.chatLmDaysCounted;
+  const ud = escapeHtml(CHATBOT_UNDER_DEVELOPMENT);
 
   return `
-    <table style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:360px;margin:0 0 16px 0" cellspacing="0" cellpadding="0">
+    <table role="presentation" width="100%" style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:480px;margin:0 0 16px 0;mso-table-lspace:0pt;mso-table-rspace:0pt;" cellspacing="0" cellpadding="0">
       <thead>
         <tr>
           <th style="${thLeft}">Summary</th>
           <th style="${thStyle}">${col} (daily)</th>
-          <th style="${thStyle}">MTD avg${mtdN > 0 ? ` (${mtdN}d)` : ''}</th>
+          <th style="${thStyle}">MTD Daily Avg${mtdN > 0 ? ` (${mtdN}d)` : ''}</th>
+          <th style="${thStyle}">LM avg${lmN > 0 ? ` (${lmN}d)` : ''}</th>
         </tr>
       </thead>
       <tbody>
@@ -215,16 +229,19 @@ function renderChatSummaryTable(report: DailyEmailReportData): string {
           <td style="${tdBase}">Frustration Rate</td>
           <td style="${tdBase};text-align:center">${fr}</td>
           <td style="${tdBase};text-align:center">${frm}</td>
+          <td style="${tdBase};text-align:center">${frl}</td>
         </tr>
         <tr style="background:#f9fafb">
           <td style="${tdBase}">Confusion Rate</td>
           <td style="${tdBase};text-align:center">${cr}</td>
           <td style="${tdBase};text-align:center">${crm}</td>
+          <td style="${tdBase};text-align:center">${crl}</td>
         </tr>
         <tr style="background:#fff">
           <td style="${tdBase}">Chatbot Coverage</td>
-          <td style="${tdBase};text-align:center">0.0%</td>
-          <td style="${tdBase};text-align:center">${EM}</td>
+          <td style="${tdBase};text-align:center">${ud}</td>
+          <td style="${tdBase};text-align:center">${ud}</td>
+          <td style="${tdBase};text-align:center">${ud}</td>
         </tr>
       </tbody>
     </table>`;
@@ -247,7 +264,7 @@ export function renderDailyEmailText(report: DailyEmailReportData): string {
     const pr = `pr d ${r.prospectCc}/${r.prospectMv} mtd ${r.prospectMtdCc}/${r.prospectMtdMv} avg ${fmtAvgCell(r.prospectMtdAvgCc)}/${fmtAvgCell(r.prospectMtdAvgMv)}`;
     const sa = `sa d ${r.salesCc}/${r.salesMv} mtd ${r.salesMtdCc}/${r.salesMtdMv} avg ${fmtAvgCell(r.salesMtdAvgCc)}/${fmtAvgCell(r.salesMtdAvgMv)}`;
     const cv = `conv ${r.conversionRate} mtd ${r.conversionRateMtd}`;
-    const lm = `LM avg pr/sa/cv ${fmtAvgCell(r.lmProspectDailyAvg)}/${fmtAvgCell(r.lmSalesDailyAvg)}/${r.lmConversionRate}`;
+    const lm = `LM pr ${fmtAvgCell(r.lmProspectDailyAvgCc)}/${fmtAvgCell(r.lmProspectDailyAvgMv)} sa ${fmtAvgCell(r.lmSalesDailyAvgCc)}/${fmtAvgCell(r.lmSalesDailyAvgMv)} cv ${r.lmConversionRate}`;
     return `  ${r.label}: ${pr} | ${sa} | ${cv} | ${lm}`;
   });
 
@@ -260,7 +277,7 @@ export function renderDailyEmailText(report: DailyEmailReportData): string {
     '',
     '1. Service Overview',
     ...lines,
-    `  TOTALS: pr d ${totals.prospectCc}/${totals.prospectMv} mtd ${totals.prospectMtdCc}/${totals.prospectMtdMv} | sa d ${totals.salesCc}/${totals.salesMv} mtd ${totals.salesMtdCc}/${totals.salesMtdMv} | conv ${totals.conversionRate} mtd ${totals.conversionRateMtd} | LM ${fmtAvgCell(totals.lmProspectDailyAvg)}/${fmtAvgCell(totals.lmSalesDailyAvg)}/${totals.lmConversionRate}`,
+    `  TOTALS: pr d ${totals.prospectCc}/${totals.prospectMv} mtd ${totals.prospectMtdCc}/${totals.prospectMtdMv} | sa d ${totals.salesCc}/${totals.salesMv} mtd ${totals.salesMtdCc}/${totals.salesMtdMv} | conv ${totals.conversionRate} mtd ${totals.conversionRateMtd} | LM pr ${fmtAvgCell(totals.lmProspectDailyAvgCc)}/${fmtAvgCell(totals.lmProspectDailyAvgMv)} sa ${fmtAvgCell(totals.lmSalesDailyAvgCc)}/${fmtAvgCell(totals.lmSalesDailyAvgMv)} cv ${totals.lmConversionRate}`,
     '',
     '2. CSAT & Reply Rate',
     '  (data pending —)',
@@ -271,8 +288,9 @@ export function renderDailyEmailText(report: DailyEmailReportData): string {
     `  Frustrated chats: ${report.chatAnalysis.frustratedChats}`,
     `  Confused clients: ${report.chatAnalysis.confusedClients}`,
     `  Confused chats: ${report.chatAnalysis.confusedChats}`,
-    `  Frustration rate daily: ${formatPercent(report.chatAnalysis.frustrationPercent)} | MTD avg (${report.chatAnalysis.chatMtdDaysCounted}d): ${formatPercent(report.chatAnalysis.frustrationPercentMtdAvg)}`,
-    `  Confusion rate daily: ${formatPercent(report.chatAnalysis.confusionPercent)} | MTD avg: ${formatPercent(report.chatAnalysis.confusionPercentMtdAvg)}`,
+    `  Frustration rate daily: ${formatPercent(report.chatAnalysis.frustrationPercent)} | MTD Daily Avg (${report.chatAnalysis.chatMtdDaysCounted}d): ${formatPercent(report.chatAnalysis.frustrationPercentMtdAvg)} | LM avg (${report.chatAnalysis.chatLmDaysCounted}d): ${formatPercent(report.chatAnalysis.frustrationPercentLmAvg)}`,
+    `  Confusion rate daily: ${formatPercent(report.chatAnalysis.confusionPercent)} | MTD Daily Avg: ${formatPercent(report.chatAnalysis.confusionPercentMtdAvg)} | LM avg: ${formatPercent(report.chatAnalysis.confusionPercentLmAvg)}`,
+    `  Chatbot coverage: ${CHATBOT_UNDER_DEVELOPMENT} (all columns)`,
     '',
     'CSAT columns in the HTML table still use an em dash where data is not yet available.',
     '',
@@ -295,7 +313,7 @@ export function renderDailyEmailHtml(report: DailyEmailReportData): string {
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#e8eaed;width:100%;">
     <tr>
       <td style="padding:24px 16px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:720px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:1200px;margin:0 auto;background:#fff;border-radius:8px;overflow:visible;mso-table-lspace:0pt;mso-table-rspace:0pt;">
           <tr>
             <td style="background:#4472c4;color:#fff;padding:20px 24px;">
               <div style="font-size:11px;font-weight:600;letter-spacing:0.5px;opacity:0.9">PRO Services</div>
@@ -304,7 +322,8 @@ export function renderDailyEmailHtml(report: DailyEmailReportData): string {
             </td>
           </tr>
           <tr>
-            <td style="padding:24px 24px 32px 24px;">
+            <td style="padding:24px 24px 32px 24px;width:100%;min-width:100%;">
+              <!-- keep full table visible in clients that clip narrow layouts -->
               ${sectionTitle('1', 'Service Overview')}
               ${renderServiceOverviewTable(report.prospects.rows, totals)}
               ${sectionTitle('2', 'CSAT & Reply Rate')}
@@ -313,7 +332,7 @@ export function renderDailyEmailHtml(report: DailyEmailReportData): string {
               ${renderChatMetricsTable(report)}
               ${renderChatSummaryTable(report)}
               <div style="margin-top:12px;font-size:12px;color:#424242;line-height:1.5;">
-                Prospect/sales MTD totals and averages include only days with complete data (${report.prospects.mtdDaysCounted} day(s) this month through the report date). LM uses ${report.prospects.lmDaysCounted} day(s) in the prior calendar month. Chat MTD averages use ${report.chatAnalysis.chatMtdDaysCounted} day(s) with chat analysis. CSAT columns still show &quot;&#8212;&quot; where not yet available.
+                Prospect/sales MTD totals and averages include only days with complete data (${report.prospects.mtdDaysCounted} day(s) this month through the report date). LM uses ${report.prospects.lmDaysCounted} day(s) in the prior calendar month. Chat MTD and LM averages use ${report.chatAnalysis.chatMtdDaysCounted} and ${report.chatAnalysis.chatLmDaysCounted} day(s) with chat analysis, respectively. Set <code>DAILY_EMAIL_THREAD_ROOT_MESSAGE_ID</code> to the first report&apos;s <code>Message-ID</code> so sends stay in one thread. CSAT columns still show &quot;&#8212;&quot; where not yet available.
               </div>
               <div style="margin-top:20px;font-size:10px;color:#5f6368;font-style:italic;">
                 Generated automatically for ${escapeHtml(report.date)} (${escapeHtml(report.timezone)}).
