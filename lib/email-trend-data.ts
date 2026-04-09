@@ -2,23 +2,23 @@ import { getDailyChatAnalysisData } from '@/lib/chat-storage';
 import { SERVICE_OVERVIEW_PRODUCT_LABELS, type ServiceOverviewRow } from '@/lib/email-report-layout';
 import { tryLoadServiceOverviewForDate } from '@/lib/email-report-periods';
 
-/** Same as dashboard email: sales / prospects × 100 for that product/day. */
-function rowConversionRatePercent(r: ServiceOverviewRow): number | null {
+/** sales / prospects × 100; when prospects are 0, conversion is defined as 0% (no division by zero). */
+function rowConversionRatePercent(r: ServiceOverviewRow): number {
   const prospects = r.prospectCc + r.prospectMv;
   const sales = r.salesCc + r.salesMv;
   if (prospects <= 0) {
-    return null;
+    return 0;
   }
   return (100 * sales) / prospects;
 }
 
 /**
  * Load daily conversion rate (% per product) and chat rates for each date.
- * Missing prospect days → null for all products that day; missing chat → null for rates.
+ * Missing snapshot for a day → null per product that day; missing chat → null for rates.
  */
 export async function loadEmailTrendSeries(dates: string[]): Promise<{
   labels: string[];
-  /** Percent 0–100 per product per day (null if no data or no prospects that day). */
+  /** Percent 0–100 per product per day (null only if no row for that product/day; 0 prospects → 0%). */
   conversionRatePctByLabel: Map<string, (number | null)[]>;
   frustration: (number | null)[];
   confusion: (number | null)[];
@@ -63,7 +63,7 @@ export async function loadEmailTrendSeries(dates: string[]): Promise<{
       const byL = new Map(rows.map((r) => [r.label, r] as const));
       for (const lb of labels) {
         const r = byL.get(lb);
-        conversionRatePctByLabel.get(lb)!.push(r ? rowConversionRatePercent(r) : null);
+        conversionRatePctByLabel.get(lb)!.push(r !== undefined ? rowConversionRatePercent(r) : null);
       }
     }
 
