@@ -1,10 +1,18 @@
 /**
- * Inline SVG line charts for HTML email (no JS). Font matches bundled Noto Sans in `lib/svg-to-png.ts` for Resvg.
+ * Inline SVG line charts for HTML email (no JS). Font matches bundled Noto Sans in `lib/svg-to-png.ts`.
  */
 
 const FONT = 'Noto Sans, Arial, Helvetica, sans-serif';
 const TEXT_FILL = '#1a1a1a';
 const MUTED = '#555555';
+
+/** Pixels reserved below chart for x-axis labels (long month names). */
+const X_AXIS_PAD = 52;
+
+/** Top margin before plot so titles never overlap lines. */
+const PLOT_TOP = 72;
+const TITLE_Y = 22;
+const SUBTITLE_Y = 50;
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -25,23 +33,6 @@ const PRODUCT_COLORS = [
 export interface ConversionSeriesInput {
   label: string;
   values: (number | null)[];
-}
-
-function ceilToStep(n: number, step: number): number {
-  if (n <= 0) return step;
-  return Math.ceil(n / step) * step;
-}
-
-/** Y-axis max and step (5 or 10) so tick count stays readable */
-function conversionYScale(ymax: number): { yTop: number; step: number } {
-  if (ymax <= 0) return { yTop: 5, step: 5 };
-  const rough = ceilToStep(ymax, 5);
-  const numTicks = rough / 5 + 1;
-  if (numTicks > 16) {
-    const yTop = ceilToStep(ymax, 10);
-    return { yTop: Math.max(yTop, 10), step: 10 };
-  }
-  return { yTop: Math.max(rough, 5), step: 5 };
 }
 
 function buildPath(
@@ -65,25 +56,30 @@ function buildPath(
   return d.trim();
 }
 
-function xLabelStep(n: number): number {
-  if (n <= 8) return 1;
-  if (n <= 16) return 2;
-  if (n <= 31) return 3;
-  return Math.ceil(n / 12);
+/** e.g. "April 6" (month spelled out). */
+function longDateLabel(iso: string): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  return new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric' }).format(d);
 }
 
-function shortDateLabel(iso: string): string {
-  const [, m, day] = iso.split('-');
-  return `${Number(m)}/${Number(day)}`;
-}
-
-function fmtCount(v: number): string {
-  return Number.isInteger(v) ? String(v) : v.toFixed(1);
+/** Fewer x labels when text is long to reduce overlap. */
+function xLabelStepLong(n: number): number {
+  if (n <= 6) return 1;
+  if (n <= 12) return 2;
+  if (n <= 20) return 3;
+  if (n <= 28) return 4;
+  return Math.ceil(n / 6);
 }
 
 function fmtPct(v: number): string {
   const hasFraction = Math.round(v * 10) !== v * 10;
   return hasFraction ? `${v.toFixed(1)}%` : `${Math.round(v)}%`;
+}
+
+const Y_PERCENT_MAX = 100;
+
+function yPercentScale(v: number): number {
+  return Math.min(Math.max(v, 0), Y_PERCENT_MAX);
 }
 
 export function renderConversionTrendSvg(
@@ -92,15 +88,14 @@ export function renderConversionTrendSvg(
   title: string
 ): string {
   const W = 640;
-  const H = 480;
+  const H = 500;
   const padL = 56;
   const padR = 14;
-  const padT = 40;
-  const padB = 100;
+  const padB = X_AXIS_PAD + 8;
   const legendRows = Math.ceil(series.length / 2);
-  const legendH = Math.max(72, legendRows * 22 + 16);
+  const legendH = Math.max(76, legendRows * 24 + 12);
   const plotW = W - padL - padR;
-  const plotH = H - padT - padB - legendH;
+  const plotH = H - PLOT_TOP - padB - legendH;
   const n = dates.length;
 
   if (n === 0 || series.length === 0) {
@@ -109,38 +104,31 @@ export function renderConversionTrendSvg(
 </svg>`;
   }
 
-  let ymax = 0;
-  for (const s of series) {
-    for (const v of s.values) {
-      if (v !== null && v !== undefined && !Number.isNaN(v)) ymax = Math.max(ymax, v);
-    }
-  }
-  const { yTop, step } = conversionYScale(ymax);
   const xAt = (i: number) => padL + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW);
-  const yAt = (v: number) => padT + plotH - (v / yTop) * plotH;
+  const yAt = (v: number) => PLOT_TOP + plotH - (yPercentScale(v) / Y_PERCENT_MAX) * plotH;
 
   const gridLines: string[] = [];
   const yLabels: string[] = [];
-  for (let val = 0; val <= yTop + 0.001; val += step) {
-    const y = padT + plotH - (val / yTop) * plotH;
+  for (let p = 0; p <= Y_PERCENT_MAX; p += 5) {
+    const y = PLOT_TOP + plotH - (p / Y_PERCENT_MAX) * plotH;
     gridLines.push(
       `<line x1="${padL}" y1="${y}" x2="${padL + plotW}" y2="${y}" stroke="#dddddd" stroke-width="1"/>`
     );
     yLabels.push(
-      `<text x="${padL - 10}" y="${y + 4}" text-anchor="end" font-size="11" fill="${TEXT_FILL}" font-family="${FONT}">${fmtCount(val)}</text>`
+      `<text x="${padL - 10}" y="${y + 4}" text-anchor="end" font-size="10" fill="${TEXT_FILL}" font-family="${FONT}">${p}%</text>`
     );
   }
 
+  const xstep = xLabelStepLong(n);
   const xLabels: string[] = [];
-  const xstep = xLabelStep(n);
   for (let i = 0; i < n; i += xstep) {
+    const lab = longDateLabel(dates[i]);
     xLabels.push(
-      `<text x="${xAt(i)}" y="${padT + plotH + 18}" text-anchor="middle" font-size="10" fill="${MUTED}" font-family="${FONT}">${esc(shortDateLabel(dates[i]))}</text>`
+      `<text x="${xAt(i)}" y="${PLOT_TOP + plotH + 16}" text-anchor="middle" font-size="9" fill="${MUTED}" font-family="${FONT}">${esc(lab)}</text>`
     );
   }
 
   const paths: string[] = [];
-  const pointLabels: string[] = [];
   series.forEach((s, idx) => {
     const color = PRODUCT_COLORS[idx % PRODUCT_COLORS.length];
     const path = buildPath(s.values, xAt, yAt);
@@ -149,25 +137,14 @@ export function renderConversionTrendSvg(
         `<path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`
       );
     }
-    const stackOffset = (idx % 5) * 11;
-    for (let i = 0; i < s.values.length; i++) {
-      const v = s.values[i];
-      if (v === null || v === undefined || Number.isNaN(v)) continue;
-      const cx = xAt(i);
-      const cy = yAt(v);
-      const ty = cy - 8 - stackOffset;
-      pointLabels.push(
-        `<text x="${cx}" y="${ty}" text-anchor="middle" font-size="9" font-weight="600" fill="${color}" font-family="${FONT}">${esc(fmtCount(v))}</text>`
-      );
-    }
   });
 
-  const legendY = padT + plotH + 32;
+  const legendY = PLOT_TOP + plotH + 36;
   const legendItems = series.map((s, idx) => {
     const col = idx % 2;
     const row = Math.floor(idx / 2);
     const lx = padL + col * 300;
-    const ly = legendY + row * 22;
+    const ly = legendY + row * 24;
     const color = PRODUCT_COLORS[idx % PRODUCT_COLORS.length];
     return `<g>
   <rect x="${lx}" y="${ly - 10}" width="12" height="12" fill="${color}" stroke="#cccccc" stroke-width="0.5"/>
@@ -177,14 +154,13 @@ export function renderConversionTrendSvg(
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}">
   <rect width="100%" height="100%" fill="#fafafa"/>
-  <text x="${W / 2}" y="26" text-anchor="middle" font-size="14" font-weight="700" fill="${TEXT_FILL}" font-family="${FONT}">${esc(title)}</text>
-  <text x="${W / 2}" y="42" text-anchor="middle" font-size="10" fill="${MUTED}" font-family="${FONT}">${esc('Y axis: daily conversion count (CC+MV sales per product)')}</text>
-  <line x1="${padL}" y1="${padT + plotH}" x2="${padL + plotW}" y2="${padT + plotH}" stroke="#888888" stroke-width="1"/>
-  <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + plotH}" stroke="#888888" stroke-width="1"/>
+  <text x="${W / 2}" y="${TITLE_Y}" text-anchor="middle" font-size="14" font-weight="700" fill="${TEXT_FILL}" font-family="${FONT}">${esc(title)}</text>
+  <text x="${W / 2}" y="${SUBTITLE_Y}" text-anchor="middle" font-size="10" fill="${MUTED}" font-family="${FONT}">${esc('Y axis: conversion rate (0–100%), every 5%')}</text>
+  <line x1="${padL}" y1="${PLOT_TOP + plotH}" x2="${padL + plotW}" y2="${PLOT_TOP + plotH}" stroke="#888888" stroke-width="1"/>
+  <line x1="${padL}" y1="${PLOT_TOP}" x2="${padL}" y2="${PLOT_TOP + plotH}" stroke="#888888" stroke-width="1"/>
   ${gridLines.join('\n  ')}
   ${yLabels.join('\n  ')}
   ${paths.join('\n  ')}
-  ${pointLabels.join('\n  ')}
   ${xLabels.join('\n  ')}
   ${legendItems.join('\n  ')}
 </svg>`;
@@ -197,15 +173,14 @@ export function renderChatRatesTrendSvg(
   title: string
 ): string {
   const W = 640;
-  const H = 400;
+  const H = 420;
   const padL = 58;
   const padR = 14;
-  const padT = 40;
-  const padB = 72;
+  const padB = X_AXIS_PAD + 8;
+  const legendBlock = 44;
   const plotW = W - padL - padR;
-  const plotH = H - padT - padB;
+  const plotH = H - PLOT_TOP - padB - legendBlock;
   const n = dates.length;
-  const yTop = 100;
 
   if (n === 0) {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="120" viewBox="0 0 ${W} 120" role="img" aria-label="${esc(title)}">
@@ -214,12 +189,12 @@ export function renderChatRatesTrendSvg(
   }
 
   const xAt = (i: number) => padL + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW);
-  const yAt = (v: number) => padT + plotH - (v / yTop) * plotH;
+  const yAt = (v: number) => PLOT_TOP + plotH - (yPercentScale(v) / Y_PERCENT_MAX) * plotH;
 
   const gridLines: string[] = [];
   const yLabels: string[] = [];
-  for (let p = 0; p <= 100; p += 5) {
-    const y = padT + plotH - (p / yTop) * plotH;
+  for (let p = 0; p <= Y_PERCENT_MAX; p += 5) {
+    const y = PLOT_TOP + plotH - (p / Y_PERCENT_MAX) * plotH;
     gridLines.push(
       `<line x1="${padL}" y1="${y}" x2="${padL + plotW}" y2="${y}" stroke="#dddddd" stroke-width="1"/>`
     );
@@ -228,11 +203,11 @@ export function renderChatRatesTrendSvg(
     );
   }
 
-  const step = xLabelStep(n);
+  const step = xLabelStepLong(n);
   const xLabels: string[] = [];
   for (let i = 0; i < n; i += step) {
     xLabels.push(
-      `<text x="${xAt(i)}" y="${padT + plotH + 18}" text-anchor="middle" font-size="10" fill="${MUTED}" font-family="${FONT}">${esc(shortDateLabel(dates[i]))}</text>`
+      `<text x="${xAt(i)}" y="${PLOT_TOP + plotH + 16}" text-anchor="middle" font-size="9" fill="${MUTED}" font-family="${FONT}">${esc(longDateLabel(dates[i]))}</text>`
     );
   }
 
@@ -252,28 +227,31 @@ export function renderChatRatesTrendSvg(
   }
 
   const pointLabels: string[] = [];
-  for (let i = 0; i < n; i++) {
-    const fr = frustration[i];
-    if (fr !== null && fr !== undefined && !Number.isNaN(fr)) {
-      const cx = xAt(i);
-      const cy = yAt(fr);
-      pointLabels.push(
-        `<text x="${cx}" y="${cy - 10}" text-anchor="middle" font-size="9" font-weight="600" fill="#c0392b" font-family="${FONT}">${esc(fmtPct(fr))}</text>`
-      );
+  const showPointLabels = n <= 8;
+  if (showPointLabels) {
+    for (let i = 0; i < n; i++) {
+      const fr = frustration[i];
+      if (fr !== null && fr !== undefined && !Number.isNaN(fr)) {
+        const cx = xAt(i);
+        const cy = yAt(fr);
+        pointLabels.push(
+          `<text x="${cx}" y="${cy - 12}" text-anchor="middle" font-size="8" font-weight="600" fill="#c0392b" font-family="${FONT}">${esc(fmtPct(fr))}</text>`
+        );
+      }
     }
-  }
-  for (let i = 0; i < n; i++) {
-    const cf = confusion[i];
-    if (cf !== null && cf !== undefined && !Number.isNaN(cf)) {
-      const cx = xAt(i);
-      const cy = yAt(cf);
-      pointLabels.push(
-        `<text x="${cx}" y="${cy + 14}" text-anchor="middle" font-size="9" font-weight="600" fill="#2471a3" font-family="${FONT}">${esc(fmtPct(cf))}</text>`
-      );
+    for (let i = 0; i < n; i++) {
+      const cf = confusion[i];
+      if (cf !== null && cf !== undefined && !Number.isNaN(cf)) {
+        const cx = xAt(i);
+        const cy = yAt(cf);
+        pointLabels.push(
+          `<text x="${cx}" y="${cy + 16}" text-anchor="middle" font-size="8" font-weight="600" fill="#2471a3" font-family="${FONT}">${esc(fmtPct(cf))}</text>`
+        );
+      }
     }
   }
 
-  const legendY = padT + plotH + 36;
+  const legendY = PLOT_TOP + plotH + 34;
   const leg = `<g>
   <rect x="${padL}" y="${legendY - 10}" width="12" height="12" fill="#e74c3c" stroke="#cccccc" stroke-width="0.5"/>
   <text x="${padL + 18}" y="${legendY + 1}" font-size="12" font-weight="600" fill="${TEXT_FILL}" font-family="${FONT}">Frustration rate</text>
@@ -283,10 +261,10 @@ export function renderChatRatesTrendSvg(
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}">
   <rect width="100%" height="100%" fill="#fafafa"/>
-  <text x="${W / 2}" y="26" text-anchor="middle" font-size="14" font-weight="700" fill="${TEXT_FILL}" font-family="${FONT}">${esc(title)}</text>
-  <text x="${W / 2}" y="42" text-anchor="middle" font-size="10" fill="${MUTED}" font-family="${FONT}">${esc('Y axis: percent (0–100%), grid every 5%')}</text>
-  <line x1="${padL}" y1="${padT + plotH}" x2="${padL + plotW}" y2="${padT + plotH}" stroke="#888888" stroke-width="1"/>
-  <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + plotH}" stroke="#888888" stroke-width="1"/>
+  <text x="${W / 2}" y="${TITLE_Y}" text-anchor="middle" font-size="14" font-weight="700" fill="${TEXT_FILL}" font-family="${FONT}">${esc(title)}</text>
+  <text x="${W / 2}" y="${SUBTITLE_Y}" text-anchor="middle" font-size="10" fill="${MUTED}" font-family="${FONT}">${esc('Y axis: percent (0–100%), every 5%')}</text>
+  <line x1="${padL}" y1="${PLOT_TOP + plotH}" x2="${padL + plotW}" y2="${PLOT_TOP + plotH}" stroke="#888888" stroke-width="1"/>
+  <line x1="${padL}" y1="${PLOT_TOP}" x2="${padL}" y2="${PLOT_TOP + plotH}" stroke="#888888" stroke-width="1"/>
   ${gridLines.join('\n  ')}
   ${yLabels.join('\n  ')}
   ${lines.join('\n  ')}

@@ -224,12 +224,12 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
   const rangeLabel = formatTrendRangeLabel(date);
   const conversionSeries = trendSeries.labels.map((label) => ({
     label,
-    values: trendSeries.conversionByLabel.get(label) ?? [],
+    values: trendSeries.conversionRatePctByLabel.get(label) ?? [],
   }));
   const conversionSvg = renderConversionTrendSvg(
     trendDates,
     conversionSeries,
-    `Daily conversions by product (${rangeLabel})`
+    `Daily conversion rate by product (${rangeLabel})`
   );
   const chatRatesSvg = renderChatRatesTrendSvg(
     trendDates,

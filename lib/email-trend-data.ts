@@ -2,24 +2,31 @@ import { getDailyChatAnalysisData } from '@/lib/chat-storage';
 import type { ServiceOverviewRow } from '@/lib/email-report-layout';
 import { tryLoadServiceOverviewForDate } from '@/lib/email-report-periods';
 
-function rowSalesTotal(r: ServiceOverviewRow): number {
-  return r.salesCc + r.salesMv;
+/** Same as dashboard email: sales / prospects × 100 for that product/day. */
+function rowConversionRatePercent(r: ServiceOverviewRow): number | null {
+  const prospects = r.prospectCc + r.prospectMv;
+  const sales = r.salesCc + r.salesMv;
+  if (prospects <= 0) {
+    return null;
+  }
+  return (100 * sales) / prospects;
 }
 
 /**
- * Load daily conversions per service line and chat rates for each date.
+ * Load daily conversion rate (% per product) and chat rates for each date.
  * Missing prospect days → null for all products that day; missing chat → null for rates.
  */
 export async function loadEmailTrendSeries(dates: string[]): Promise<{
   labels: string[];
-  conversionByLabel: Map<string, (number | null)[]>;
+  /** Percent 0–100 per product per day (null if no data or no prospects that day). */
+  conversionRatePctByLabel: Map<string, (number | null)[]>;
   frustration: (number | null)[];
   confusion: (number | null)[];
 }> {
   if (dates.length === 0) {
     return {
       labels: [],
-      conversionByLabel: new Map(),
+      conversionRatePctByLabel: new Map(),
       frustration: [],
       confusion: [],
     };
@@ -43,9 +50,9 @@ export async function loadEmailTrendSeries(dates: string[]): Promise<{
     }
   }
 
-  const conversionByLabel = new Map<string, (number | null)[]>();
+  const conversionRatePctByLabel = new Map<string, (number | null)[]>();
   for (const lb of labels) {
-    conversionByLabel.set(lb, []);
+    conversionRatePctByLabel.set(lb, []);
   }
 
   const frustration: (number | null)[] = [];
@@ -56,13 +63,13 @@ export async function loadEmailTrendSeries(dates: string[]): Promise<{
 
     if (!rows) {
       for (const lb of labels) {
-        conversionByLabel.get(lb)!.push(null);
+        conversionRatePctByLabel.get(lb)!.push(null);
       }
     } else {
       const byL = new Map(rows.map((r) => [r.label, r] as const));
       for (const lb of labels) {
         const r = byL.get(lb);
-        conversionByLabel.get(lb)!.push(r ? rowSalesTotal(r) : null);
+        conversionRatePctByLabel.get(lb)!.push(r ? rowConversionRatePercent(r) : null);
       }
     }
 
@@ -75,5 +82,5 @@ export async function loadEmailTrendSeries(dates: string[]): Promise<{
     }
   }
 
-  return { labels, conversionByLabel, frustration, confusion };
+  return { labels, conversionRatePctByLabel, frustration, confusion };
 }
