@@ -139,25 +139,36 @@ export function renderConversionTrendSvg(
     }
   });
 
-  /** Same pattern as chat chart: small % labels; cap days so labels stay readable. */
-  const showConversionPointLabels = n <= 12;
-  const pointLabels: string[] = [];
-  if (showConversionPointLabels) {
-    const xNudge =
-      series.length > 1 ? (idx: number) => (idx - (series.length - 1) / 2) * 11 : () => 0;
+  /**
+   * Per date: stack all conversion % in a fixed band between the 100% and 50% grid lines,
+   * highest value at the top. Color matches the line (legend); no labels on the lines themselves.
+   */
+  const conversionColumnLabels: string[] = [];
+  const bandTopPx = yAt(100) + 4;
+  const bandBottomPx = yAt(50) - 4;
+  for (let i = 0; i < n; i++) {
+    const entries: { value: number; idx: number }[] = [];
     series.forEach((s, idx) => {
-      const color = PRODUCT_COLORS[idx % PRODUCT_COLORS.length];
-      for (let i = 0; i < n; i++) {
-        const v = s.values[i];
-        if (v === null || v === undefined || Number.isNaN(v)) {
-          continue;
-        }
-        const cx = xAt(i) + xNudge(idx);
-        const cy = yAt(v);
-        pointLabels.push(
-          `<text x="${cx}" y="${cy - 12}" text-anchor="middle" font-size="8" font-weight="600" fill="${color}" font-family="${FONT}">${esc(fmtPct(v))}</text>`
-        );
+      const v = s.values[i];
+      if (v !== null && v !== undefined && !Number.isNaN(v)) {
+        entries.push({ value: v, idx });
       }
+    });
+    if (entries.length === 0) {
+      continue;
+    }
+    entries.sort((a, b) => b.value - a.value);
+    const k = entries.length;
+    const spanPx = bandBottomPx - bandTopPx;
+    const slotH = spanPx / k;
+    const cx = xAt(i);
+    entries.forEach((e, j) => {
+      const yCenter = bandTopPx + (j + 0.5) * slotH;
+      const color = PRODUCT_COLORS[e.idx % PRODUCT_COLORS.length];
+      const yBaseline = yCenter + 3;
+      conversionColumnLabels.push(
+        `<text x="${cx}" y="${yBaseline}" text-anchor="middle" font-size="8" font-weight="600" fill="${color}" font-family="${FONT}">${esc(fmtPct(e.value))}</text>`
+      );
     });
   }
 
@@ -177,13 +188,13 @@ export function renderConversionTrendSvg(
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}">
   <rect width="100%" height="100%" fill="#fafafa"/>
   <text x="${W / 2}" y="${TITLE_Y}" text-anchor="middle" font-size="14" font-weight="700" fill="${TEXT_FILL}" font-family="${FONT}">${esc(title)}</text>
-  <text x="${W / 2}" y="${SUBTITLE_Y}" text-anchor="middle" font-size="10" fill="${MUTED}" font-family="${FONT}">${esc('Y axis: conversion rate (0–100%), every 5%')}</text>
+  <text x="${W / 2}" y="${SUBTITLE_Y}" text-anchor="middle" font-size="10" fill="${MUTED}" font-family="${FONT}">${esc('Per-date % stacked between 100% and 50% (high→low); colors match lines. Y axis every 5%.')}</text>
   <line x1="${padL}" y1="${PLOT_TOP + plotH}" x2="${padL + plotW}" y2="${PLOT_TOP + plotH}" stroke="#888888" stroke-width="1"/>
   <line x1="${padL}" y1="${PLOT_TOP}" x2="${padL}" y2="${PLOT_TOP + plotH}" stroke="#888888" stroke-width="1"/>
   ${gridLines.join('\n  ')}
   ${yLabels.join('\n  ')}
   ${paths.join('\n  ')}
-  ${pointLabels.join('\n  ')}
+  ${conversionColumnLabels.join('\n  ')}
   ${xLabels.join('\n  ')}
   ${legendItems.join('\n  ')}
 </svg>`;
