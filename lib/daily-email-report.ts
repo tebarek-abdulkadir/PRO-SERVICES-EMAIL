@@ -19,7 +19,7 @@ import {
 } from '@/lib/email-report-periods';
 import { loadEmailTrendSeries } from '@/lib/email-trend-data';
 import { renderChatRatesTrendSvg, renderConversionTrendSvg } from '@/lib/email-trend-charts';
-import { trySvgToPngDataUrl } from '@/lib/svg-to-png';
+import { trySvgToPngBuffer } from '@/lib/svg-to-png';
 import type { EmailSalesCcMvSplit, EnrichedProspectDetail } from '@/lib/prospects-report';
 import { getDashboardProspectsData } from '@/lib/prospects-report';
 import type { ByContractType, Prospects } from '@/lib/types';
@@ -89,9 +89,22 @@ export interface DailyEmailReportData {
   trendCharts: {
     rangeLabel: string;
     dayCount: number;
-    /** PNG data URL for `<img>` (email-safe); null if rasterization failed */
-    conversionPngDataUrl: string | null;
-    chatRatesPngDataUrl: string | null;
+    /** PNG bytes: attach with `cid:` for real email; use data URL in dry-run HTML preview */
+    conversionPng: Buffer | null;
+    chatRatesPng: Buffer | null;
+  };
+}
+
+/** Safe for `JSON.stringify` (strips binary). */
+export function serializeDailyEmailReportForJson(report: DailyEmailReportData): Record<string, unknown> {
+  return {
+    ...report,
+    trendCharts: {
+      rangeLabel: report.trendCharts.rangeLabel,
+      dayCount: report.trendCharts.dayCount,
+      conversionPngBytes: report.trendCharts.conversionPng?.length ?? 0,
+      chatRatesPngBytes: report.trendCharts.chatRatesPng?.length ?? 0,
+    },
   };
 }
 
@@ -225,14 +238,14 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
     `Frustration & confusion (${rangeLabel})`
   );
 
-  const convPng = trySvgToPngDataUrl(conversionSvg);
-  const chatPng = trySvgToPngDataUrl(chatRatesSvg);
-  const conversionPngDataUrl = 'dataUrl' in convPng ? convPng.dataUrl : null;
-  const chatRatesPngDataUrl = 'dataUrl' in chatPng ? chatPng.dataUrl : null;
-  if (!conversionPngDataUrl) {
+  const convPng = trySvgToPngBuffer(conversionSvg);
+  const chatPng = trySvgToPngBuffer(chatRatesSvg);
+  const conversionPng = 'buffer' in convPng ? convPng.buffer : null;
+  const chatRatesPng = 'buffer' in chatPng ? chatPng.buffer : null;
+  if (!conversionPng) {
     console.error('[Daily Email] Conversion chart PNG failed:', 'error' in convPng ? convPng.error : '');
   }
-  if (!chatRatesPngDataUrl) {
+  if (!chatRatesPng) {
     console.error('[Daily Email] Chat rates chart PNG failed:', 'error' in chatPng ? chatPng.error : '');
   }
 
@@ -263,8 +276,8 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
     trendCharts: {
       rangeLabel,
       dayCount: trendDates.length,
-      conversionPngDataUrl,
-      chatRatesPngDataUrl,
+      conversionPng,
+      chatRatesPng,
     },
   };
 }

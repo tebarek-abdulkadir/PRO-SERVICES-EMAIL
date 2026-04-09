@@ -1,4 +1,5 @@
 import type { DailyEmailReportData } from '@/lib/daily-email-report';
+import { EMAIL_TREND_CHAT_RATES_CID, EMAIL_TREND_CONVERSION_CID } from '@/lib/email-trend-cids';
 import type { ServiceOverviewRow } from '@/lib/email-report-layout';
 
 function escapeHtml(value: string): string {
@@ -247,12 +248,21 @@ function renderChatSummaryTable(report: DailyEmailReportData): string {
     </table>`;
 }
 
-function trendChartImg(dataUrl: string | null, alt: string): string {
-  if (!dataUrl) {
+/**
+ * @param mode `cid` for real SMTP (inline attachments); `dataUrl` for browser preview (e.g. dry-run JSON).
+ */
+function trendChartImg(
+  png: Buffer | null,
+  alt: string,
+  mode: 'cid' | 'dataUrl',
+  cid: string
+): string {
+  if (!png?.length) {
     return `<p style="margin:8px 0;font-size:12px;color:#c0392b;font-family:${font}">Chart could not be generated. Check server logs.</p>`;
   }
   const a = escapeHtml(alt);
-  return `<img src="${dataUrl}" alt="${a}" width="640" style="max-width:100%;height:auto;display:block;border:0;outline:none;text-decoration:none;line-height:100%;vertical-align:bottom;-ms-interpolation-mode:bicubic;font-family:${font}" />`;
+  const src = mode === 'cid' ? `cid:${cid}` : `data:image/png;base64,${png.toString('base64')}`;
+  return `<img src="${src}" alt="${a}" width="640" style="max-width:100%;height:auto;display:block;border:0;outline:none;text-decoration:none;line-height:100%;vertical-align:bottom;-ms-interpolation-mode:bicubic;font-family:${font}" />`;
 }
 
 function sectionTitle(num: string, title: string): string {
@@ -309,7 +319,10 @@ export function renderDailyEmailText(report: DailyEmailReportData): string {
   ].join('\n');
 }
 
-export function renderDailyEmailHtml(report: DailyEmailReportData): string {
+export function renderDailyEmailHtml(
+  report: DailyEmailReportData,
+  chartImageMode: 'cid' | 'dataUrl' = 'cid'
+): string {
   const subject = escapeHtml(buildDailyEmailSubject(report));
   const totals = report.prospects.totalsRow;
 
@@ -347,10 +360,20 @@ export function renderDailyEmailHtml(report: DailyEmailReportData): string {
                 Daily series through ${escapeHtml(report.trendCharts.rangeLabel)} (${report.trendCharts.dayCount} day${report.trendCharts.dayCount === 1 ? '' : 's'}). Missing days leave gaps in the lines.
               </div>
               <div style="margin:0 0 20px 0;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;">
-                ${trendChartImg(report.trendCharts.conversionPngDataUrl, `Daily conversions by product (${report.trendCharts.rangeLabel})`)}
+                ${trendChartImg(
+                  report.trendCharts.conversionPng,
+                  `Daily conversions by product (${report.trendCharts.rangeLabel})`,
+                  chartImageMode,
+                  EMAIL_TREND_CONVERSION_CID
+                )}
               </div>
               <div style="margin:0 0 24px 0;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;">
-                ${trendChartImg(report.trendCharts.chatRatesPngDataUrl, `Frustration and confusion (${report.trendCharts.rangeLabel})`)}
+                ${trendChartImg(
+                  report.trendCharts.chatRatesPng,
+                  `Frustration and confusion (${report.trendCharts.rangeLabel})`,
+                  chartImageMode,
+                  EMAIL_TREND_CHAT_RATES_CID
+                )}
               </div>
               <div style="margin-top:12px;font-size:12px;color:#424242;line-height:1.5;">
                 Prospect/sales MTD totals and averages include only days with complete data (${report.prospects.mtdDaysCounted} day(s) this month through the report date). LM uses ${report.prospects.lmDaysCounted} day(s) in the prior calendar month. Chat MTD and LM averages use ${report.chatAnalysis.chatMtdDaysCounted} and ${report.chatAnalysis.chatLmDaysCounted} day(s) with chat analysis, respectively. Set <code>DAILY_EMAIL_THREAD_ROOT_MESSAGE_ID</code> to the first report&apos;s <code>Message-ID</code> so sends stay in one thread. CSAT columns still show &quot;&#8212;&quot; where not yet available.

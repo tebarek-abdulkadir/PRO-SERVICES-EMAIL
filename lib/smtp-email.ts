@@ -57,11 +57,19 @@ function recipientAddressingMode(): 'to_all' | 'to_and_cc' {
   return 'to_all';
 }
 
+/** Inline PNG/other parts referenced from HTML as `<img src="cid:…">` (required by Outlook and many clients). */
+export interface InlineEmailAttachment {
+  filename: string;
+  content: Buffer;
+  cid: string;
+}
+
 export interface SendSmtpEmailInput {
   to?: string[];
   subject: string;
   html: string;
   text: string;
+  inlineAttachments?: InlineEmailAttachment[];
 }
 
 export interface SmtpSendResult {
@@ -100,6 +108,7 @@ export async function sendSmtpEmail({
   subject,
   html,
   text,
+  inlineAttachments,
 }: SendSmtpEmailInput): Promise<SmtpSendResult> {
   const host = smtpHost();
   if (!host) {
@@ -149,6 +158,14 @@ export async function sendSmtpEmail({
         }
       : undefined;
 
+  const attachmentParts =
+    inlineAttachments?.map((a) => ({
+      filename: a.filename,
+      content: a.content,
+      cid: a.cid,
+      contentDisposition: 'inline' as const,
+    })) ?? [];
+
   const info = await transporter.sendMail({
     from,
     to: mailTo,
@@ -156,6 +173,7 @@ export async function sendSmtpEmail({
     subject,
     html,
     text,
+    attachments: attachmentParts.length > 0 ? attachmentParts : undefined,
     ...(threadHeaders ? { headers: threadHeaders } : {}),
   });
 
