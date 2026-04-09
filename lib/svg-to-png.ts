@@ -5,6 +5,9 @@ import { Resvg } from '@resvg/resvg-js';
 /** Bundled OFL font so Resvg always has glyphs (no reliance on server system fonts). */
 const NOTO_SANS_TTF = path.join(process.cwd(), 'lib', 'fonts', 'NotoSans-Regular.ttf');
 
+/** Raster scale for chart SVGs (logical size stays 640px wide; PNG dimensions multiply by this). */
+const CHART_PNG_ZOOM = 3;
+
 function resvgOptions(): ConstructorParameters<typeof Resvg>[1] {
   const fontFiles = fs.existsSync(NOTO_SANS_TTF) ? [NOTO_SANS_TTF] : [];
   return {
@@ -19,7 +22,10 @@ function resvgOptions(): ConstructorParameters<typeof Resvg>[1] {
 }
 
 function renderSvgToPng(svg: string): Buffer {
-  const resvg = new Resvg(svg, resvgOptions());
+  const resvg = new Resvg(svg, {
+    ...resvgOptions(),
+    fitTo: { mode: 'zoom', value: CHART_PNG_ZOOM },
+  });
   return resvg.render().asPng();
 }
 

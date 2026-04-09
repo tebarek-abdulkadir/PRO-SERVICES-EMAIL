@@ -139,6 +139,28 @@ export function renderConversionTrendSvg(
     }
   });
 
+  /** Same pattern as chat chart: small % labels; cap days so labels stay readable. */
+  const showConversionPointLabels = n <= 12;
+  const pointLabels: string[] = [];
+  if (showConversionPointLabels) {
+    const xNudge =
+      series.length > 1 ? (idx: number) => (idx - (series.length - 1) / 2) * 11 : () => 0;
+    series.forEach((s, idx) => {
+      const color = PRODUCT_COLORS[idx % PRODUCT_COLORS.length];
+      for (let i = 0; i < n; i++) {
+        const v = s.values[i];
+        if (v === null || v === undefined || Number.isNaN(v)) {
+          continue;
+        }
+        const cx = xAt(i) + xNudge(idx);
+        const cy = yAt(v);
+        pointLabels.push(
+          `<text x="${cx}" y="${cy - 12}" text-anchor="middle" font-size="8" font-weight="600" fill="${color}" font-family="${FONT}">${esc(fmtPct(v))}</text>`
+        );
+      }
+    });
+  }
+
   const legendY = PLOT_TOP + plotH + 36;
   const legendItems = series.map((s, idx) => {
     const col = idx % 2;
@@ -161,6 +183,7 @@ export function renderConversionTrendSvg(
   ${gridLines.join('\n  ')}
   ${yLabels.join('\n  ')}
   ${paths.join('\n  ')}
+  ${pointLabels.join('\n  ')}
   ${xLabels.join('\n  ')}
   ${legendItems.join('\n  ')}
 </svg>`;
@@ -227,7 +250,7 @@ export function renderChatRatesTrendSvg(
   }
 
   const pointLabels: string[] = [];
-  const showPointLabels = n <= 8;
+  const showPointLabels = n <= 12;
   if (showPointLabels) {
     for (let i = 0; i < n; i++) {
       const fr = frustration[i];

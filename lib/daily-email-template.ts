@@ -291,8 +291,6 @@ export function renderDailyEmailText(report: DailyEmailReportData): string {
     'Daily Report',
     report.displayDate,
     '',
-    `Service overview: MTD uses ${report.prospects.mtdDaysCounted} day(s) with data; LM uses ${report.prospects.lmDaysCounted} day(s).`,
-    '',
     '1. Service Overview',
     ...lines,
     `  TOTALS: pr d ${totals.prospectCc}/${totals.prospectMv} mtd ${totals.prospectMtdCc}/${totals.prospectMtdMv} | sa d ${totals.salesCc}/${totals.salesMv} mtd ${totals.salesMtdCc}/${totals.salesMtdMv} | conv ${totals.conversionRate} mtd ${totals.conversionRateMtd} | LM pr ${fmtAvgCell(totals.lmProspectDailyAvgCc)}/${fmtAvgCell(totals.lmProspectDailyAvgMv)} sa ${fmtAvgCell(totals.lmSalesDailyAvgCc)}/${fmtAvgCell(totals.lmSalesDailyAvgMv)} cv ${totals.lmConversionRate}`,
@@ -312,8 +310,6 @@ export function renderDailyEmailText(report: DailyEmailReportData): string {
     '',
     '4. Trend charts (Apr 6 → report date, same year)',
     `  ${report.trendCharts.rangeLabel} — ${report.trendCharts.dayCount} day(s). HTML includes PNG chart images (conversions per product; frustration & confusion).`,
-    '',
-    'CSAT columns in the HTML table still use an em dash where data is not yet available.',
     '',
     `Generated for ${report.date} (${report.timezone}).`,
   ].join('\n');
@@ -374,9 +370,6 @@ export function renderDailyEmailHtml(
                   chartImageMode,
                   EMAIL_TREND_CHAT_RATES_CID
                 )}
-              </div>
-              <div style="margin-top:12px;font-size:12px;color:#424242;line-height:1.5;">
-                Prospect/sales MTD totals and averages include only days with complete data (${report.prospects.mtdDaysCounted} day(s) this month through the report date). LM uses ${report.prospects.lmDaysCounted} day(s) in the prior calendar month. Chat MTD and LM averages use ${report.chatAnalysis.chatMtdDaysCounted} and ${report.chatAnalysis.chatLmDaysCounted} day(s) with chat analysis, respectively. Set <code>DAILY_EMAIL_THREAD_ROOT_MESSAGE_ID</code> to the first report&apos;s <code>Message-ID</code> so sends stay in one thread. CSAT columns still show &quot;&#8212;&quot; where not yet available.
               </div>
               <div style="margin-top:20px;font-size:10px;color:#5f6368;font-style:italic;">
                 Generated automatically for ${escapeHtml(report.date)} (${escapeHtml(report.timezone)}).
