@@ -1,16 +1,25 @@
+import fs from 'fs';
+import path from 'path';
 import { Resvg } from '@resvg/resvg-js';
 
-const RESVG_OPTS = {
-  background: '#fafafa',
-  font: {
-    loadSystemFonts: false,
-    defaultFontFamily: 'Arial',
-    sansSerifFamily: 'Arial',
-  },
-} as const;
+/** Bundled OFL font so Resvg always has glyphs (no reliance on server system fonts). */
+const NOTO_SANS_TTF = path.join(process.cwd(), 'lib', 'fonts', 'NotoSans-Regular.ttf');
+
+function resvgOptions(): ConstructorParameters<typeof Resvg>[1] {
+  const fontFiles = fs.existsSync(NOTO_SANS_TTF) ? [NOTO_SANS_TTF] : [];
+  return {
+    background: '#fafafa',
+    font: {
+      loadSystemFonts: fontFiles.length === 0,
+      ...(fontFiles.length ? { fontFiles } : {}),
+      defaultFontFamily: fontFiles.length ? 'Noto Sans' : 'Arial',
+      sansSerifFamily: fontFiles.length ? 'Noto Sans' : 'Arial',
+    },
+  };
+}
 
 function renderSvgToPng(svg: string): Buffer {
-  const resvg = new Resvg(svg, RESVG_OPTS);
+  const resvg = new Resvg(svg, resvgOptions());
   return resvg.render().asPng();
 }
 

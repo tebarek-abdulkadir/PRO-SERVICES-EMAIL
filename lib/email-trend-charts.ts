@@ -1,8 +1,8 @@
 /**
- * Inline SVG line charts for HTML email (no JS). Text uses Arial — Resvg rasterizes it reliably with loadSystemFonts: false.
+ * Inline SVG line charts for HTML email (no JS). Font matches bundled Noto Sans in `lib/svg-to-png.ts` for Resvg.
  */
 
-const FONT = 'Arial, Helvetica, sans-serif';
+const FONT = 'Noto Sans, Arial, Helvetica, sans-serif';
 const TEXT_FILL = '#1a1a1a';
 const MUTED = '#555555';
 

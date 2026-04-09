@@ -24,7 +24,7 @@ import type { EmailSalesCcMvSplit, EnrichedProspectDetail } from '@/lib/prospect
 import { getDashboardProspectsData } from '@/lib/prospects-report';
 import type { ByContractType, Prospects } from '@/lib/types';
 
-/** Calendar day for automated report + email labels; default EAT so it matches cron scheduled in East Africa (Dubai is UTC+4 and can already be “tomorrow” when Nairobi is still “today”). */
+/** Report timezone for labels; default calendar day for data is **yesterday** in this zone (see `resolveReportDate`). */
 const REPORT_DATE_TIMEZONE = process.env.REPORT_DATE_TIMEZONE || 'Africa/Nairobi';
 
 interface DatePayload {
@@ -319,8 +319,9 @@ export function resolveReportDate(searchParams: URLSearchParams, now = new Date(
     return overrideDate;
   }
 
-  // Same calendar day in East Africa (or REPORT_DATE_TIMEZONE) — aligns with EAT cron
-  return getDateInTimeZone(now, REPORT_DATE_TIMEZONE);
+  /** Default: yesterday in REPORT_DATE_TIMEZONE so a run on March 10 uses March 9 data (daily + MTD through that day). */
+  const todayInTz = getDateInTimeZone(now, REPORT_DATE_TIMEZONE);
+  return getPreviousDate(todayInTz);
 }
 
 export function isDryRun(searchParams: URLSearchParams): boolean {
