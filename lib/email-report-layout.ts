@@ -20,9 +20,26 @@ export interface ServiceOverviewRow {
   label: string;
   prospectCc: number;
   prospectMv: number;
+  /** Sum of daily prospect CC in current month through report date (days with data only). */
+  prospectMtdCc: number;
+  prospectMtdMv: number;
+  /** prospectMtd / days counted */
+  prospectMtdAvgCc: number;
+  prospectMtdAvgMv: number;
   salesCc: number;
   salesMv: number;
+  salesMtdCc: number;
+  salesMtdMv: number;
+  salesMtdAvgCc: number;
+  salesMtdAvgMv: number;
+  /** Daily conversion for the report date */
   conversionRate: string;
+  /** Sales MTD total / prospect MTD total */
+  conversionRateMtd: string;
+  /** Last calendar month: avg daily (CC+MV) prospects for this service */
+  lmProspectDailyAvg: number;
+  lmSalesDailyAvg: number;
+  lmConversionRate: string;
 }
 
 function normalizeCountryToken(s: string): string {
@@ -63,13 +80,27 @@ function serviceOverviewRow(
   salesCc: number,
   salesMv: number
 ): ServiceOverviewRow {
+  const pt = prospectCc + prospectMv;
+  const st = salesCc + salesMv;
   return {
     label,
     prospectCc,
     prospectMv,
+    prospectMtdCc: 0,
+    prospectMtdMv: 0,
+    prospectMtdAvgCc: 0,
+    prospectMtdAvgMv: 0,
     salesCc,
     salesMv,
-    conversionRate: formatServiceConversionRate(prospectCc + prospectMv, salesCc + salesMv),
+    salesMtdCc: 0,
+    salesMtdMv: 0,
+    salesMtdAvgCc: 0,
+    salesMtdAvgMv: 0,
+    conversionRate: formatServiceConversionRate(pt, st),
+    conversionRateMtd: '0%',
+    lmProspectDailyAvg: 0,
+    lmSalesDailyAvg: 0,
+    lmConversionRate: '0%',
   };
 }
 

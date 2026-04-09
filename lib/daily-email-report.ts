@@ -1,5 +1,6 @@
 import { getChatEmailTableMetrics } from '@/lib/chat-email-metrics';
 import { getDailyChatAnalysisData, getDailyDelayTimeData } from '@/lib/chat-storage';
+import { averageChatRatesForDateRange } from '@/lib/email-chat-mtd';
 import {
   buildServiceOverviewRows,
   formatServiceConversionRate,
@@ -8,6 +9,13 @@ import {
   shortDateColumnLabel,
   type ServiceOverviewRow,
 } from '@/lib/email-report-layout';
+import {
+  applyPeriodAggregatesToRows,
+  computeExtendedTotalsRow,
+  lastMonthDateRange,
+  loadServiceOverviewSnapshots,
+  mtdDateRange,
+} from '@/lib/email-report-periods';
 import type { EmailSalesCcMvSplit, EnrichedProspectDetail } from '@/lib/prospects-report';
 import { getDashboardProspectsData } from '@/lib/prospects-report';
 import type { ByContractType, Prospects } from '@/lib/types';
@@ -39,6 +47,11 @@ export interface DailyEmailReportData {
   generatedAt: string;
   prospects: {
     rows: ServiceOverviewRow[];
+    totalsRow: ServiceOverviewRow;
+    /** Days in MTD window that had complete prospect/sales data */
+    mtdDaysCounted: number;
+    /** Days in last calendar month that had complete prospect/sales data */
+    lmDaysCounted: number;
     /** Sum of prospect CC + MV across rows */
     total: number;
     /** Sum of sales CC + MV across rows */
@@ -53,6 +66,10 @@ export interface DailyEmailReportData {
     averageResponseTime: string | null;
     frustrationPercent: number;
     confusionPercent: number;
+    /** Mean frustration % over MTD days that have chat analysis */
+    frustrationPercentMtdAvg: number;
+    confusionPercentMtdAvg: number;
+    chatMtdDaysCounted: number;
     totalChats: number;
     /** Unique people with frustration (same as Chats page “Frustrated People”) */
     frustratedClients: number;
@@ -115,10 +132,26 @@ async function getProspectsAndSalesBlock(
 
   const columnLabelShort = shortDateColumnLabel(date, REPORT_DATE_TIMEZONE);
 
+  const mtdDates = mtdDateRange(date);
+  const lmDates = lastMonthDateRange(date);
+  const [mtdSnapshots, lmSnapshots] = await Promise.all([
+    loadServiceOverviewSnapshots(mtdDates),
+    loadServiceOverviewSnapshots(lmDates),
+  ]);
+  const { rows: periodRows, mtdDaysCounted, lmDaysCounted } = applyPeriodAggregatesToRows(
+    rows,
+    mtdSnapshots,
+    lmSnapshots
+  );
+  const totalsRow = computeExtendedTotalsRow(periodRows, mtdDaysCounted, lmSnapshots);
+
   return {
     columnLabelShort,
     prospects: {
-      rows,
+      rows: periodRows,
+      totalsRow,
+      mtdDaysCounted,
+      lmDaysCounted,
       total: totalProspects,
       totalSales: totalSalesCount,
       totalConversionRate: formatServiceConversionRate(totalProspects, totalSalesCount),
@@ -134,10 +167,12 @@ async function getAverageResponseTime(date: string): Promise<string | null> {
 }
 
 export async function getDailyEmailReportData(date: string): Promise<DailyEmailReportData> {
-  const [block, chatData, averageResponseTime] = await Promise.all([
+  const mtdDates = mtdDateRange(date);
+  const [block, chatData, averageResponseTime, chatMtd] = await Promise.all([
     getProspectsAndSalesBlock(date),
     getDailyChatAnalysisData(date),
     getAverageResponseTime(date),
+    averageChatRatesForDateRange(mtdDates),
   ]);
 
   if (!chatData) {
@@ -159,6 +194,9 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
       averageResponseTime,
       frustrationPercent: m.frustrationPercentage || 0,
       confusionPercent: m.confusionPercentage || 0,
+      frustrationPercentMtdAvg: chatMtd.frustrationPercentMtdAvg,
+      confusionPercentMtdAvg: chatMtd.confusionPercentMtdAvg,
+      chatMtdDaysCounted: chatMtd.chatMtdDaysCounted,
       totalChats: chatTable.totalChats,
       frustratedClients: chatTable.frustratedClients,
       frustratedChats: chatTable.frustratedChats,
