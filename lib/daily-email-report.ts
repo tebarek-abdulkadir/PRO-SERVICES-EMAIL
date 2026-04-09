@@ -19,6 +19,7 @@ import {
 } from '@/lib/email-report-periods';
 import { loadEmailTrendSeries } from '@/lib/email-trend-data';
 import { renderChatRatesTrendSvg, renderConversionTrendSvg } from '@/lib/email-trend-charts';
+import { trySvgToPngDataUrl } from '@/lib/svg-to-png';
 import type { EmailSalesCcMvSplit, EnrichedProspectDetail } from '@/lib/prospects-report';
 import { getDashboardProspectsData } from '@/lib/prospects-report';
 import type { ByContractType, Prospects } from '@/lib/types';
@@ -88,8 +89,9 @@ export interface DailyEmailReportData {
   trendCharts: {
     rangeLabel: string;
     dayCount: number;
-    conversionSvg: string;
-    chatRatesSvg: string;
+    /** PNG data URL for `<img>` (email-safe); null if rasterization failed */
+    conversionPngDataUrl: string | null;
+    chatRatesPngDataUrl: string | null;
   };
 }
 
@@ -223,6 +225,17 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
     `Frustration & confusion (${rangeLabel})`
   );
 
+  const convPng = trySvgToPngDataUrl(conversionSvg);
+  const chatPng = trySvgToPngDataUrl(chatRatesSvg);
+  const conversionPngDataUrl = 'dataUrl' in convPng ? convPng.dataUrl : null;
+  const chatRatesPngDataUrl = 'dataUrl' in chatPng ? chatPng.dataUrl : null;
+  if (!conversionPngDataUrl) {
+    console.error('[Daily Email] Conversion chart PNG failed:', 'error' in convPng ? convPng.error : '');
+  }
+  if (!chatRatesPngDataUrl) {
+    console.error('[Daily Email] Chat rates chart PNG failed:', 'error' in chatPng ? chatPng.error : '');
+  }
+
   return {
     date,
     displayDate: formatDisplayDate(date, REPORT_DATE_TIMEZONE),
@@ -250,8 +263,8 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
     trendCharts: {
       rangeLabel,
       dayCount: trendDates.length,
-      conversionSvg,
-      chatRatesSvg,
+      conversionPngDataUrl,
+      chatRatesPngDataUrl,
     },
   };
 }

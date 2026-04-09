@@ -247,6 +247,14 @@ function renderChatSummaryTable(report: DailyEmailReportData): string {
     </table>`;
 }
 
+function trendChartImg(dataUrl: string | null, alt: string): string {
+  if (!dataUrl) {
+    return `<p style="margin:8px 0;font-size:12px;color:#c0392b;font-family:${font}">Chart could not be generated. Check server logs.</p>`;
+  }
+  const a = escapeHtml(alt);
+  return `<img src="${dataUrl}" alt="${a}" width="640" style="max-width:100%;height:auto;display:block;border:0;outline:none;text-decoration:none;line-height:100%;vertical-align:bottom;-ms-interpolation-mode:bicubic;font-family:${font}" />`;
+}
+
 function sectionTitle(num: string, title: string): string {
   return `
     <div style="padding:8px 0 8px 12px;margin:28px 0 12px 0;font-size:16px;font-weight:bold;color:#2c3e50;border-left:4px solid #4472c4;background:#f8f9fa;font-family:${font}">
@@ -293,7 +301,7 @@ export function renderDailyEmailText(report: DailyEmailReportData): string {
     `  Chatbot coverage: ${CHATBOT_UNDER_DEVELOPMENT} (all columns)`,
     '',
     '4. Trend charts (Apr 6 → report date, same year)',
-    `  ${report.trendCharts.rangeLabel} — ${report.trendCharts.dayCount} day(s). Open HTML for line graphs: conversions per product; frustration & confusion daily %.`,
+    `  ${report.trendCharts.rangeLabel} — ${report.trendCharts.dayCount} day(s). HTML includes PNG chart images (conversions per product; frustration & confusion).`,
     '',
     'CSAT columns in the HTML table still use an em dash where data is not yet available.',
     '',
@@ -339,10 +347,10 @@ export function renderDailyEmailHtml(report: DailyEmailReportData): string {
                 Daily series through ${escapeHtml(report.trendCharts.rangeLabel)} (${report.trendCharts.dayCount} day${report.trendCharts.dayCount === 1 ? '' : 's'}). Missing days leave gaps in the lines.
               </div>
               <div style="margin:0 0 20px 0;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;">
-                ${report.trendCharts.conversionSvg}
+                ${trendChartImg(report.trendCharts.conversionPngDataUrl, `Daily conversions by product (${report.trendCharts.rangeLabel})`)}
               </div>
               <div style="margin:0 0 24px 0;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;">
-                ${report.trendCharts.chatRatesSvg}
+                ${trendChartImg(report.trendCharts.chatRatesPngDataUrl, `Frustration and confusion (${report.trendCharts.rangeLabel})`)}
               </div>
               <div style="margin-top:12px;font-size:12px;color:#424242;line-height:1.5;">
                 Prospect/sales MTD totals and averages include only days with complete data (${report.prospects.mtdDaysCounted} day(s) this month through the report date). LM uses ${report.prospects.lmDaysCounted} day(s) in the prior calendar month. Chat MTD and LM averages use ${report.chatAnalysis.chatMtdDaysCounted} and ${report.chatAnalysis.chatLmDaysCounted} day(s) with chat analysis, respectively. Set <code>DAILY_EMAIL_THREAD_ROOT_MESSAGE_ID</code> to the first report&apos;s <code>Message-ID</code> so sends stay in one thread. CSAT columns still show &quot;&#8212;&quot; where not yet available.
