@@ -57,6 +57,19 @@ export function lastMonthDateRange(reportDate: string): string[] {
   return enumerateDatesInclusive(start, end);
 }
 
+/** First day of trend window: April 6 of the report year (dashboard data available from this anchor). */
+export function emailTrendStartDate(reportDate: string): string {
+  const y = reportDate.slice(0, 4);
+  return `${y}-04-06`;
+}
+
+/** Inclusive dates from April 6 through report date; empty if report is before April 6. */
+export function emailTrendDateRange(reportDate: string): string[] {
+  const start = emailTrendStartDate(reportDate);
+  if (start > reportDate) return [];
+  return enumerateDatesInclusive(start, reportDate);
+}
+
 /**
  * Load service overview rows for one day. Returns null if prospects/sales data is missing
  * (no blob, incomplete payload, etc.) so the day is excluded from MTD/LM averages.

@@ -292,6 +292,9 @@ export function renderDailyEmailText(report: DailyEmailReportData): string {
     `  Confusion rate daily: ${formatPercent(report.chatAnalysis.confusionPercent)} | MTD Daily Avg: ${formatPercent(report.chatAnalysis.confusionPercentMtdAvg)} | LM avg: ${formatPercent(report.chatAnalysis.confusionPercentLmAvg)}`,
     `  Chatbot coverage: ${CHATBOT_UNDER_DEVELOPMENT} (all columns)`,
     '',
+    '4. Trend charts (Apr 6 → report date, same year)',
+    `  ${report.trendCharts.rangeLabel} — ${report.trendCharts.dayCount} day(s). Open HTML for line graphs: conversions per product; frustration & confusion daily %.`,
+    '',
     'CSAT columns in the HTML table still use an em dash where data is not yet available.',
     '',
     `Generated for ${report.date} (${report.timezone}).`,
@@ -331,6 +334,16 @@ export function renderDailyEmailHtml(report: DailyEmailReportData): string {
               ${sectionTitle('3', 'Chat Analysis')}
               ${renderChatMetricsTable(report)}
               ${renderChatSummaryTable(report)}
+              ${sectionTitle('4', 'Trend charts (from Apr 6)')}
+              <div style="margin:0 0 8px 0;font-size:12px;color:#424242;">
+                Daily series through ${escapeHtml(report.trendCharts.rangeLabel)} (${report.trendCharts.dayCount} day${report.trendCharts.dayCount === 1 ? '' : 's'}). Missing days leave gaps in the lines.
+              </div>
+              <div style="margin:0 0 20px 0;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;">
+                ${report.trendCharts.conversionSvg}
+              </div>
+              <div style="margin:0 0 24px 0;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;">
+                ${report.trendCharts.chatRatesSvg}
+              </div>
               <div style="margin-top:12px;font-size:12px;color:#424242;line-height:1.5;">
                 Prospect/sales MTD totals and averages include only days with complete data (${report.prospects.mtdDaysCounted} day(s) this month through the report date). LM uses ${report.prospects.lmDaysCounted} day(s) in the prior calendar month. Chat MTD and LM averages use ${report.chatAnalysis.chatMtdDaysCounted} and ${report.chatAnalysis.chatLmDaysCounted} day(s) with chat analysis, respectively. Set <code>DAILY_EMAIL_THREAD_ROOT_MESSAGE_ID</code> to the first report&apos;s <code>Message-ID</code> so sends stay in one thread. CSAT columns still show &quot;&#8212;&quot; where not yet available.
               </div>

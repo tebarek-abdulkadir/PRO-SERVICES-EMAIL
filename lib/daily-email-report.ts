@@ -12,10 +12,13 @@ import {
 import {
   applyPeriodAggregatesToRows,
   computeExtendedTotalsRow,
+  emailTrendDateRange,
   lastMonthDateRange,
   loadServiceOverviewSnapshots,
   mtdDateRange,
 } from '@/lib/email-report-periods';
+import { loadEmailTrendSeries } from '@/lib/email-trend-data';
+import { renderChatRatesTrendSvg, renderConversionTrendSvg } from '@/lib/email-trend-charts';
 import type { EmailSalesCcMvSplit, EnrichedProspectDetail } from '@/lib/prospects-report';
 import { getDashboardProspectsData } from '@/lib/prospects-report';
 import type { ByContractType, Prospects } from '@/lib/types';
@@ -81,6 +84,20 @@ export interface DailyEmailReportData {
     confusedClients: number;
     confusedChats: number;
   };
+  /** Daily trends from Apr 6 through report date (same calendar year as report) */
+  trendCharts: {
+    rangeLabel: string;
+    dayCount: number;
+    conversionSvg: string;
+    chatRatesSvg: string;
+  };
+}
+
+function formatTrendRangeLabel(reportDate: string): string {
+  const y = reportDate.slice(0, 4);
+  const end = new Date(`${reportDate}T12:00:00Z`);
+  const endStr = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(end);
+  return `Apr 6 – ${endStr}, ${y}`;
 }
 
 function parseBooleanParam(value: string | null): boolean {
@@ -172,12 +189,14 @@ async function getAverageResponseTime(date: string): Promise<string | null> {
 export async function getDailyEmailReportData(date: string): Promise<DailyEmailReportData> {
   const mtdDates = mtdDateRange(date);
   const lmChatDates = lastMonthDateRange(date);
-  const [block, chatData, averageResponseTime, chatMtd, chatLm] = await Promise.all([
+  const trendDates = emailTrendDateRange(date);
+  const [block, chatData, averageResponseTime, chatMtd, chatLm, trendSeries] = await Promise.all([
     getProspectsAndSalesBlock(date),
     getDailyChatAnalysisData(date),
     getAverageResponseTime(date),
     averageChatRatesForDateRange(mtdDates),
     averageChatRatesForDateRange(lmChatDates),
+    loadEmailTrendSeries(trendDates),
   ]);
 
   if (!chatData) {
@@ -186,6 +205,23 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
 
   const m = chatData.overallMetrics;
   const chatTable = getChatEmailTableMetrics(chatData);
+
+  const rangeLabel = formatTrendRangeLabel(date);
+  const conversionSeries = trendSeries.labels.map((label) => ({
+    label,
+    values: trendSeries.conversionByLabel.get(label) ?? [],
+  }));
+  const conversionSvg = renderConversionTrendSvg(
+    trendDates,
+    conversionSeries,
+    `Daily conversions by product (${rangeLabel})`
+  );
+  const chatRatesSvg = renderChatRatesTrendSvg(
+    trendDates,
+    trendSeries.frustration,
+    trendSeries.confusion,
+    `Frustration & confusion (${rangeLabel})`
+  );
 
   return {
     date,
@@ -210,6 +246,12 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
       frustratedChats: chatTable.frustratedChats,
       confusedClients: chatTable.confusedClients,
       confusedChats: chatTable.confusedChats,
+    },
+    trendCharts: {
+      rangeLabel,
+      dayCount: trendDates.length,
+      conversionSvg,
+      chatRatesSvg,
     },
   };
 }
