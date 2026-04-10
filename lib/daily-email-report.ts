@@ -24,7 +24,7 @@ import type { EmailSalesCcMvSplit, EnrichedProspectDetail } from '@/lib/prospect
 import { getDashboardProspectsData } from '@/lib/prospects-report';
 import type { ByContractType, Prospects } from '@/lib/types';
 
-/** Report timezone for labels; default calendar day for data is **yesterday** in this zone (see `resolveReportDate`). */
+/** Report timezone for labels; default calendar day for data is **today** in this zone (see `resolveReportDate`). */
 const REPORT_DATE_TIMEZONE = process.env.REPORT_DATE_TIMEZONE || 'Africa/Nairobi';
 
 interface DatePayload {
@@ -319,9 +319,8 @@ export function resolveReportDate(searchParams: URLSearchParams, now = new Date(
     return overrideDate;
   }
 
-  /** Default: yesterday in REPORT_DATE_TIMEZONE so a run on March 10 uses March 9 data (daily + MTD through that day). */
-  const todayInTz = getDateInTimeZone(now, REPORT_DATE_TIMEZONE);
-  return getPreviousDate(todayInTz);
+  /** Default: today in REPORT_DATE_TIMEZONE (daily row + MTD + trends through this calendar day). */
+  return getDateInTimeZone(now, REPORT_DATE_TIMEZONE);
 }
 
 export function isDryRun(searchParams: URLSearchParams): boolean {

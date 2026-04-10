@@ -64,7 +64,7 @@ Ops data is intentionally excluded from this email.
 
 `vercel.json` schedules the route to run daily at `0 16 * * *` UTC, which is **7:00 PM** East Africa Time (`Africa/Nairobi`, UTC+3, no DST).
 
-The report **date** (which day’s blob data to load) defaults to **yesterday** in `REPORT_DATE_TIMEZONE` (default `Africa/Nairobi`), so a run on March 10 uses **March 9** for the daily section and for MTD through that day. Set `REPORT_DATE_TIMEZONE=Asia/Dubai` only if you intentionally want that zone’s calendar. Override any time with `?date=YYYY-MM-DD`.
+The report **date** (which day’s blob data to load) defaults to **today** in `REPORT_DATE_TIMEZONE` (default `Africa/Nairobi`), so a run on March 10 uses **March 10** for the daily section and for MTD through that day. Set `REPORT_DATE_TIMEZONE=Asia/Dubai` only if you intentionally want that zone’s calendar. Override any time with `?date=YYYY-MM-DD`.
 
 ### Required environment variables
 
