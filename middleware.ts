@@ -2,9 +2,19 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getCookieSecret, verifyToken } from "@/lib/dashboard-auth";
 
+/** Paths that authenticate with INGEST_API_KEY inside route handlers — must bypass dashboard gate when key matches. */
+function isIngestApiKeyRoute(pathname: string): boolean {
+  if (pathname.startsWith("/api/ingest/")) return true;
+  if (pathname === "/api/chat-analysis" || pathname.startsWith("/api/chat-analysis/"))
+    return true;
+  if (/^\/api\/dates\/[^/]+\/delete$/.test(pathname)) return true;
+  return false;
+}
+
 export async function middleware(request: NextRequest) {
   const password = process.env.DASHBOARD_PASSWORD;
   const cronSecret = process.env.CRON_SECRET;
+  const ingestApiKey = process.env.INGEST_API_KEY;
   if (!password) {
     return NextResponse.next();
   }
@@ -39,6 +49,15 @@ export async function middleware(request: NextRequest) {
     cronSecret &&
     (request.headers.get("x-internal-cron-secret") === cronSecret ||
       bearerToken === cronSecret)
+  ) {
+    return NextResponse.next();
+  }
+
+  if (
+    path.startsWith("/api/") &&
+    ingestApiKey &&
+    isIngestApiKeyRoute(path) &&
+    bearerToken === ingestApiKey
   ) {
     return NextResponse.next();
   }
