@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { dedupeChatConversationResults } from '@/lib/chat-email-metrics';
 import { createEmptyByChatsViewMetrics } from '@/lib/chat-by-chats-metrics';
-import type { ChatAnalysisData, ChatAnalysisResult, ChatTrendData } from '@/lib/chat-types';
+import type { ChatAnalysisData, ChatTrendData } from '@/lib/chat-types';
 import DatePickerCalendar from '@/components/DatePickerCalendar';
 import ChatTrendChart from '@/components/ChatTrendChart';
 
