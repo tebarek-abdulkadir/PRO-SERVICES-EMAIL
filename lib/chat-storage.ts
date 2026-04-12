@@ -178,6 +178,9 @@ export async function aggregateDailyChatAnalysisResults(
     clientId?: string;
     maidId?: string;
     contractId?: string;
+    clientName?: string;
+    maidName?: string;
+    contractType?: string;
     joinedSkills?: string;
   }>,
   analysisDate: string
@@ -254,6 +257,9 @@ export async function aggregateDailyChatAnalysisResults(
       if (conv.contractId && !existing.contractId) existing.contractId = conv.contractId;
       if (conv.clientId && !existing.clientId) existing.clientId = conv.clientId;
       if (conv.maidId && !existing.maidId) existing.maidId = conv.maidId;
+      if (conv.clientName && !existing.clientName) existing.clientName = conv.clientName;
+      if (conv.maidName && !existing.maidName) existing.maidName = conv.maidName;
+      if (conv.contractType && !existing.contractType) existing.contractType = conv.contractType;
       if (conv.service && !existing.service) existing.service = conv.service;
       if (conv.skill && !existing.skill) existing.skill = conv.skill;
       existing.joinedSkills = mergeJoinedSkillsFields(existing.joinedSkills, conv.joinedSkills);
@@ -334,6 +340,9 @@ export async function aggregateDailyChatAnalysisResults(
       if (!existing.clientId && conv.clientId) existing.clientId = conv.clientId;
       if (!existing.maidId && conv.maidId) existing.maidId = conv.maidId;
       if (!existing.contractId && conv.contractId) existing.contractId = conv.contractId;
+      if (!existing.clientName && conv.clientName) existing.clientName = conv.clientName;
+      if (!existing.maidName && conv.maidName) existing.maidName = conv.maidName;
+      if (!existing.contractType && conv.contractType) existing.contractType = conv.contractType;
       existing.joinedSkills = mergeJoinedSkillsFields(existing.joinedSkills, conv.joinedSkills);
       
     } else {
@@ -436,6 +445,12 @@ export async function aggregateDailyChatAnalysisResults(
       existing.frustrated = existing.frustrated || entity.frustrated;
       existing.confused = existing.confused || entity.confused;
       existing.joinedSkills = mergeJoinedSkillsFields(existing.joinedSkills, entity.joinedSkills);
+      if (!existing.clientName && entity.clientName) existing.clientName = entity.clientName;
+      if (!existing.maidName && entity.maidName) existing.maidName = entity.maidName;
+      if (!existing.contractType && entity.contractType) existing.contractType = entity.contractType;
+      if (!existing.contractId && entity.contractId) existing.contractId = entity.contractId;
+      if (!existing.clientId && entity.clientId) existing.clientId = entity.clientId;
+      if (!existing.maidId && entity.maidId) existing.maidId = entity.maidId;
       
       // Update conversation ID index
       convIds.forEach(id => conversationIdIndex.set(id, mergeKey!));
@@ -469,6 +484,9 @@ export async function aggregateDailyChatAnalysisResults(
         clientId: entity.clientId,
         maidId: entity.maidId,
         contractId: entity.contractId,
+        clientName: entity.clientName,
+        maidName: entity.maidName,
+        contractType: entity.contractType,
         originalConversationId: Array.from(entity.mergedConversationIds || []).join(','), // Keep original for reference
       });
     });
@@ -582,6 +600,12 @@ export async function aggregateDailyChatAnalysisResults(
       existing.frustrated = existing.frustrated || conv.frustrated;
       existing.confused = existing.confused || conv.confused;
       existing.joinedSkills = mergeJoinedSkillsFields(existing.joinedSkills, conv.joinedSkills);
+      if (!existing.clientName && conv.clientName) existing.clientName = conv.clientName;
+      if (!existing.maidName && conv.maidName) existing.maidName = conv.maidName;
+      if (!existing.contractType && conv.contractType) existing.contractType = conv.contractType;
+      if (!existing.contractId && conv.contractId) existing.contractId = conv.contractId;
+      if (!existing.clientId && conv.clientId) existing.clientId = conv.clientId;
+      if (!existing.maidId && conv.maidId) existing.maidId = conv.maidId;
     } else {
       // New entry
       contentMergeMap.set(contentKey, {
@@ -690,6 +714,12 @@ export async function aggregateDailyChatAnalysisResults(
       service: conv.service,
       skill: conv.skill,
       ...(joinedSkillsMerged ? { joinedSkills: joinedSkillsMerged } : {}),
+      ...(conv.contractId ? { contractId: String(conv.contractId) } : {}),
+      ...(conv.clientId ? { clientId: String(conv.clientId) } : {}),
+      ...(conv.maidId ? { maidId: String(conv.maidId) } : {}),
+      ...(conv.contractType ? { contractType: String(conv.contractType) } : {}),
+      ...(conv.clientName ? { clientName: conv.clientName } : {}),
+      ...(conv.maidName ? { maidName: conv.maidName } : {}),
     };
   });
   

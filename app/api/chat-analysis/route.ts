@@ -6,6 +6,12 @@ import {
   mergeJoinedSkillsFields,
   resolveJoinedSkillsForMergedIds,
 } from '@/lib/chat-joined-skills';
+import {
+  buildEntityFieldsLookupMap,
+  pickEntityFieldsFromRawRow,
+  resolveEntityFieldsForMergedIds,
+  type RawIngestEntityFields,
+} from '@/lib/chat-ingest-raw-fields';
 import type { ChatAnalysisData, ChatAnalysisRequest, ChatAnalysisResponse, ChatAnalysisResult, ChatDataResponse } from '@/lib/chat-types';
 
 type RawIngestRow = {
@@ -13,26 +19,54 @@ type RawIngestRow = {
   frustrated: boolean;
   confused: boolean;
   joinedSkills?: string;
-};
+} & RawIngestEntityFields;
 
 /**
- * After aggregation, re-apply joinedSkills + byChatsView from the normalized POST body only.
+ * After aggregation, re-apply joinedSkills, entity fields, and byChatsView from the normalized POST body only.
  * This cannot be dropped by entity/content merge inside chat-storage.
  */
-function applyJoinedSkillsFromRawIngest(
+function applyRawIngestPostProcessing(
   data: ChatAnalysisData,
   rawRows: RawIngestRow[]
 ): ChatAnalysisData {
-  const lookup = buildJoinedSkillsLookupMap(
+  const joinedLookup = buildJoinedSkillsLookupMap(
     rawRows.map((r) => ({ conversationId: String(r.conversationId), joinedSkills: r.joinedSkills }))
   );
 
+  const entityLookup = buildEntityFieldsLookupMap(
+    rawRows.map((r) => ({
+      conversationId: String(r.conversationId),
+      contractId: r.contractId,
+      clientId: r.clientId,
+      maidId: r.maidId,
+      clientName: r.clientName,
+      maidName: r.maidName,
+      contractType: r.contractType,
+    }))
+  );
+
   const conversationResults: ChatAnalysisResult[] = data.conversationResults.map((r) => {
-    const fromRaw = resolveJoinedSkillsForMergedIds(String(r.conversationId), lookup);
-    const joinedSkills = mergeJoinedSkillsFields(r.joinedSkills, fromRaw).trim();
+    const idCsv = String(r.conversationId);
+    const fromRawJoined = resolveJoinedSkillsForMergedIds(idCsv, joinedLookup);
+    const joinedSkills = mergeJoinedSkillsFields(r.joinedSkills, fromRawJoined).trim();
+    const entity = resolveEntityFieldsForMergedIds(idCsv, entityLookup);
+    const mergedEntity: RawIngestEntityFields = {
+      contractId: entity.contractId || r.contractId,
+      clientId: entity.clientId || r.clientId,
+      maidId: entity.maidId || r.maidId,
+      clientName: entity.clientName || r.clientName,
+      maidName: entity.maidName || r.maidName,
+      contractType: entity.contractType || r.contractType,
+    };
     return {
       ...r,
       ...(joinedSkills ? { joinedSkills } : {}),
+      ...(mergedEntity.contractId ? { contractId: mergedEntity.contractId } : {}),
+      ...(mergedEntity.clientId ? { clientId: mergedEntity.clientId } : {}),
+      ...(mergedEntity.maidId ? { maidId: mergedEntity.maidId } : {}),
+      ...(mergedEntity.clientName ? { clientName: mergedEntity.clientName } : {}),
+      ...(mergedEntity.maidName ? { maidName: mergedEntity.maidName } : {}),
+      ...(mergedEntity.contractType ? { contractType: mergedEntity.contractType } : {}),
     };
   });
 
@@ -175,11 +209,15 @@ export async function POST(request: Request): Promise<NextResponse<ChatAnalysisR
       
       // Log first conversation to verify service/skill are being received
       if (index === 0) {
+        const ent = pickEntityFieldsFromRawRow(conv);
         console.log('[Chat Analysis API] Sample conversation data:', {
           conversationId: conv.conversationId,
           service: conv.service,
           skill: conv.skill,
           joinedSkillsLen: typeof conv.joinedSkills === 'string' ? conv.joinedSkills.length : 0,
+          hasContractId: !!ent.contractId,
+          hasClientId: !!ent.clientId,
+          hasClientName: !!ent.clientName,
         });
       }
       
@@ -195,6 +233,8 @@ export async function POST(request: Request): Promise<NextResponse<ChatAnalysisR
             ? String(joinedSkillsRaw)
             : undefined;
 
+      const entity = pickEntityFieldsFromRawRow(conv);
+
       return {
         conversationId: String(conv.conversationId),
         chatStartDateTime: conv.chatStartDateTime || new Date().toISOString(),
@@ -205,19 +245,19 @@ export async function POST(request: Request): Promise<NextResponse<ChatAnalysisR
         service: conv.service,
         skill: conv.skill,
         joinedSkills,
-        maidId: conv.maidId,
-        clientId: conv.clientId,
-        contractId: conv.contractId,
-        maidName: conv.maidName,
-        clientName: conv.clientName,
-        contractType: conv.contractType,
+        maidId: entity.maidId,
+        clientId: entity.clientId,
+        contractId: entity.contractId,
+        maidName: entity.maidName,
+        clientName: entity.clientName,
+        contractType: entity.contractType,
       };
     });
 
     // Aggregate the individual conversation scores into daily dashboard data
     const aggregatedData = await aggregateDailyChatAnalysisResults(conversations, analysisDate);
 
-    const toSave = applyJoinedSkillsFromRawIngest(aggregatedData, conversations);
+    const toSave = applyRawIngestPostProcessing(aggregatedData, conversations);
 
     console.log('[Chat Analysis API] Pre-save snapshot:', {
       resultRows: toSave.conversationResults.length,

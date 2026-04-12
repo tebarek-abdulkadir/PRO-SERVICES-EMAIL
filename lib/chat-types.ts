@@ -11,6 +11,13 @@ export interface ChatAnalysisResult {
   skill?: string; // Skill/team (e.g., "VBC_RESOLVERS_AGENTS")
   /** Comma-separated skills from CC; used for By Chats classification (contains match). */
   joinedSkills?: string;
+  /** Entity fields from ingest (N8N); used for person grouping + display. */
+  contractId?: string;
+  clientId?: string;
+  maidId?: string;
+  contractType?: string;
+  clientName?: string;
+  maidName?: string;
 }
 
 /** Precomputed metrics for the "By Conversation" (chats) view — from joinedSkills, deduped by conversation id only. */
@@ -142,9 +149,9 @@ export interface ChatAnalysisRequest {
     keyPhrases: string[]; // Key phrases extracted by LLM
     service?: string; // Service type (e.g., "OEC", "travel to leb")
     skill?: string; // Skill/team (e.g., "VBC_RESOLVERS_AGENTS")
-    maidId?: string;
-    clientId?: string;
-    contractId?: string;
+    maidId?: string | number;
+    clientId?: string | number;
+    contractId?: string | number;
     maidName?: string;
     clientName?: string;
     /** Comma-separated; bot/agent for By Chats uses contains on this field. */
