@@ -9,6 +9,63 @@ export interface ChatAnalysisResult {
   analysisDate: string;
   service?: string; // Service type (e.g., "OEC", "travel to leb")
   skill?: string; // Skill/team (e.g., "VBC_RESOLVERS_AGENTS")
+  /** Comma-separated skills from CC; used for By Chats classification (contains match). */
+  joinedSkills?: string;
+}
+
+/** Precomputed metrics for the "By Conversation" (chats) view — from joinedSkills, deduped by conversation id only. */
+export interface ByChatsViewMetrics {
+  totalChats: number;
+  totalFrustrated: number;
+  totalConfused: number;
+  frustratedPctOfAllChats: number;
+  confusedPctOfAllChats: number;
+
+  totalBot: number;
+  totalAgent: number;
+  totalBotPctOfAllChats: number;
+  totalAgentPctOfAllChats: number;
+
+  frustratedInTotalBot: number;
+  confusedInTotalBot: number;
+  frustrationPctWithinTotalBot: number;
+  confusionPctWithinTotalBot: number;
+
+  frustratedInTotalAgent: number;
+  confusedInTotalAgent: number;
+  frustrationPctWithinTotalAgent: number;
+  confusionPctWithinTotalAgent: number;
+
+  fullyBot: number;
+  fullyBotPctOfAllChats: number;
+  frustratedInFullyBot: number;
+  confusedInFullyBot: number;
+  frustrationPctWithinFullyBot: number;
+  confusionPctWithinFullyBot: number;
+
+  botWithAgentMessage: number;
+  botWithAgentPctOfTotalBot: number;
+  frustratedInBotWithAgent: number;
+  confusedInBotWithAgent: number;
+  frustrationPctWithinBotWithAgent: number;
+  confusionPctWithinBotWithAgent: number;
+
+  fullyAgent: number;
+  fullyAgentPctOfAllChats: number;
+  frustratedInFullyAgent: number;
+  confusedInFullyAgent: number;
+  frustrationPctWithinFullyAgent: number;
+  confusionPctWithinFullyAgent: number;
+
+  agentWithBotMessage: number;
+  agentWithBotPctOfTotalAgent: number;
+  frustratedInAgentWithBot: number;
+  confusedInAgentWithBot: number;
+  frustrationPctWithinAgentWithBot: number;
+  confusionPctWithinAgentWithBot: number;
+
+  /** Defensive: conversations matching neither bot nor agent tokens in joinedSkills */
+  neitherBotNorAgent: number;
 }
 
 export interface ChatTrendData {
@@ -68,6 +125,8 @@ export interface ChatAnalysisData {
     };
   };
   conversationResults: ChatAnalysisResult[];
+  /** Computed on ingest from joinedSkills; omit in older daily JSON. */
+  byChatsView?: ByChatsViewMetrics;
 }
 
 // API Request/Response types
@@ -88,6 +147,8 @@ export interface ChatAnalysisRequest {
     contractId?: string;
     maidName?: string;
     clientName?: string;
+    /** Comma-separated; bot/agent for By Chats uses contains on this field. */
+    joinedSkills?: string;
   }[];
 }
 

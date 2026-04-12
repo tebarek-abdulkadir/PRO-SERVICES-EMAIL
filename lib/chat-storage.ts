@@ -10,6 +10,7 @@ import type {
   AgentDelayStats,
   AgentResponseTimeRecord
 } from './chat-types';
+import { computeByChatsViewMetrics, createEmptyByChatsViewMetrics } from './chat-by-chats-metrics';
 
 const CHAT_BLOB_PREFIX = 'chat-analysis';
 const DELAY_BLOB_PREFIX = 'delay-time';
@@ -172,12 +173,22 @@ export async function aggregateDailyChatAnalysisResults(
     clientId?: string;
     maidId?: string;
     contractId?: string;
+    joinedSkills?: string;
   }>,
   analysisDate: string
 ): Promise<ChatAnalysisData> {
   if (conversations.length === 0) {
     return createEmptyChatAnalysisData(analysisDate);
   }
+
+  const byChatsView = computeByChatsViewMetrics(
+    conversations.map((c) => ({
+      conversationId: c.conversationId,
+      frustrated: c.frustrated,
+      confused: c.confused,
+      joinedSkills: c.joinedSkills,
+    }))
+  );
 
   console.log(`[Chat Storage] Starting aggregation of ${conversations.length} conversations`);
 
@@ -720,6 +731,7 @@ export async function aggregateDailyChatAnalysisResults(
       },
     },
     conversationResults: results,
+    byChatsView,
   };
 }
 
@@ -730,6 +742,7 @@ function createEmptyChatAnalysisData(analysisDate: string): ChatAnalysisData {
   return {
     lastUpdated: new Date().toISOString(),
     analysisDate,
+    byChatsView: createEmptyByChatsViewMetrics(),
     overallMetrics: {
       frustratedCount: 0,
       frustrationPercentage: 0,

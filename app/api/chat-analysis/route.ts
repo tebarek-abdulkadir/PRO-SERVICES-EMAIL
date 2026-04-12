@@ -109,6 +109,13 @@ export async function POST(request: Request): Promise<NextResponse<ChatAnalysisR
         });
       }
       
+      const joinedSkills =
+        typeof conv.joinedSkills === 'string'
+          ? conv.joinedSkills
+          : typeof conv.JOINED_SKILLS === 'string'
+            ? conv.JOINED_SKILLS
+            : undefined;
+
       return {
         conversationId: conv.conversationId,
         chatStartDateTime: conv.chatStartDateTime || new Date().toISOString(),
@@ -118,6 +125,7 @@ export async function POST(request: Request): Promise<NextResponse<ChatAnalysisR
         keyPhrases: Array.isArray(conv.keyPhrases) ? conv.keyPhrases : [],
         service: conv.service,
         skill: conv.skill,
+        joinedSkills,
         maidId: conv.maidId,
         clientId: conv.clientId,
         contractId: conv.contractId,
