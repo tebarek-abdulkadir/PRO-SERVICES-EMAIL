@@ -130,18 +130,24 @@ export async function POST(request: Request): Promise<NextResponse<ChatAnalysisR
           conversationId: conv.conversationId,
           service: conv.service,
           skill: conv.skill,
+          joinedSkillsLen: typeof conv.joinedSkills === 'string' ? conv.joinedSkills.length : 0,
         });
       }
       
+      const joinedSkillsRaw =
+        conv.joinedSkills ??
+        conv.JOINED_SKILLS ??
+        (conv as Record<string, unknown>).joined_skills ??
+        (conv as Record<string, unknown>).JoinedSkills;
       const joinedSkills =
-        typeof conv.joinedSkills === 'string'
-          ? conv.joinedSkills
-          : typeof conv.JOINED_SKILLS === 'string'
-            ? conv.JOINED_SKILLS
+        typeof joinedSkillsRaw === 'string'
+          ? joinedSkillsRaw
+          : joinedSkillsRaw != null
+            ? String(joinedSkillsRaw)
             : undefined;
 
       return {
-        conversationId: conv.conversationId,
+        conversationId: String(conv.conversationId),
         chatStartDateTime: conv.chatStartDateTime || new Date().toISOString(),
         frustrated: Boolean(conv.frustrated),
         confused: Boolean(conv.confused),

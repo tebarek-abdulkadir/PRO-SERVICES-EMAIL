@@ -53,3 +53,33 @@ export function mergeJoinedSkillsFromRawForMergedIds(
   }
   return acc ?? '';
 }
+
+/**
+ * Built once from the raw POST `conversations` array before any merge. Keys are normalized
+ * conversation ids so lookup survives string/number quirks and comma-separated ids in POST rows.
+ */
+export function buildJoinedSkillsLookupMap(
+  raw: ReadonlyArray<{ conversationId: string; joinedSkills?: string }>
+): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const c of raw) {
+    if (!c.joinedSkills?.trim()) continue;
+    for (const id of String(c.conversationId).split(',').map((s) => s.trim()).filter(Boolean)) {
+      m.set(id, mergeJoinedSkillsFields(m.get(id), c.joinedSkills));
+    }
+  }
+  return m;
+}
+
+/** Resolve joinedSkills for a stored row (possibly comma-separated ids) using the lookup map. */
+export function resolveJoinedSkillsForMergedIds(
+  mergedConversationIdCsv: string,
+  lookup: Map<string, string>
+): string {
+  let acc: string | undefined;
+  for (const id of mergedConversationIdCsv.split(',').map((s) => s.trim()).filter(Boolean)) {
+    const j = lookup.get(id);
+    if (j) acc = mergeJoinedSkillsFields(acc, j);
+  }
+  return acc ?? '';
+}

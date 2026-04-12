@@ -11,7 +11,11 @@ import type {
   AgentResponseTimeRecord
 } from './chat-types';
 import { computeByChatsViewMetrics, createEmptyByChatsViewMetrics } from './chat-by-chats-metrics';
-import { mergeJoinedSkillsFields, mergeJoinedSkillsFromRawForMergedIds } from './chat-joined-skills';
+import {
+  buildJoinedSkillsLookupMap,
+  mergeJoinedSkillsFields,
+  resolveJoinedSkillsForMergedIds,
+} from './chat-joined-skills';
 
 const CHAT_BLOB_PREFIX = 'chat-analysis';
 const DELAY_BLOB_PREFIX = 'delay-time';
@@ -184,11 +188,16 @@ export async function aggregateDailyChatAnalysisResults(
 
   const byChatsView = computeByChatsViewMetrics(
     conversations.map((c) => ({
-      conversationId: c.conversationId,
+      conversationId: String(c.conversationId),
       frustrated: c.frustrated,
       confused: c.confused,
       joinedSkills: c.joinedSkills,
     }))
+  );
+
+  /** Survives merge pipeline: map CHxxx -> joinedSkills string from raw POST only. */
+  const joinedSkillsLookup = buildJoinedSkillsLookupMap(
+    conversations.map((c) => ({ ...c, conversationId: String(c.conversationId) }))
   );
 
   console.log(`[Chat Storage] Starting aggregation of ${conversations.length} conversations`);
@@ -669,8 +678,8 @@ export async function aggregateDailyChatAnalysisResults(
   // Convert merged conversations to ChatAnalysisResult format for storage
   // Use mergedForResults to avoid duplicate entries in UI for same entity/content
   const results: ChatAnalysisResult[] = mergedForResults.map((conv) => {
-    const fromRawIngest = mergeJoinedSkillsFromRawForMergedIds(conv.conversationId, conversations);
-    const joinedSkillsMerged = mergeJoinedSkillsFields(conv.joinedSkills, fromRawIngest).trim();
+    const fromLookup = resolveJoinedSkillsForMergedIds(String(conv.conversationId), joinedSkillsLookup);
+    const joinedSkillsMerged = mergeJoinedSkillsFields(conv.joinedSkills, fromLookup).trim();
     return {
       conversationId: conv.conversationId, // Already contains comma-separated IDs if merged
       frustrated: conv.frustrated,
@@ -690,6 +699,8 @@ export async function aggregateDailyChatAnalysisResults(
       conversationId: results[0].conversationId,
       service: results[0].service,
       skill: results[0].skill,
+      joinedSkillsLen: results[0].joinedSkills?.length ?? 0,
+      lookupSize: joinedSkillsLookup.size,
     });
   }
 
