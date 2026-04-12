@@ -1,7 +1,56 @@
 import { NextResponse } from 'next/server';
 import { saveDailyChatAnalysisData, aggregateDailyChatAnalysisResults, getLatestChatAnalysisData, getDailyChatAnalysisData } from '@/lib/chat-storage';
 import { computeByChatsViewMetrics } from '@/lib/chat-by-chats-metrics';
+import {
+  buildJoinedSkillsLookupMap,
+  mergeJoinedSkillsFields,
+  resolveJoinedSkillsForMergedIds,
+} from '@/lib/chat-joined-skills';
 import type { ChatAnalysisData, ChatAnalysisRequest, ChatAnalysisResponse, ChatAnalysisResult, ChatDataResponse } from '@/lib/chat-types';
+
+type RawIngestRow = {
+  conversationId: string;
+  frustrated: boolean;
+  confused: boolean;
+  joinedSkills?: string;
+};
+
+/**
+ * After aggregation, re-apply joinedSkills + byChatsView from the normalized POST body only.
+ * This cannot be dropped by entity/content merge inside chat-storage.
+ */
+function applyJoinedSkillsFromRawIngest(
+  data: ChatAnalysisData,
+  rawRows: RawIngestRow[]
+): ChatAnalysisData {
+  const lookup = buildJoinedSkillsLookupMap(
+    rawRows.map((r) => ({ conversationId: String(r.conversationId), joinedSkills: r.joinedSkills }))
+  );
+
+  const conversationResults: ChatAnalysisResult[] = data.conversationResults.map((r) => {
+    const fromRaw = resolveJoinedSkillsForMergedIds(String(r.conversationId), lookup);
+    const joinedSkills = mergeJoinedSkillsFields(r.joinedSkills, fromRaw).trim();
+    return {
+      ...r,
+      ...(joinedSkills ? { joinedSkills } : {}),
+    };
+  });
+
+  const byChatsView = computeByChatsViewMetrics(
+    rawRows.map((c) => ({
+      conversationId: String(c.conversationId),
+      frustrated: c.frustrated,
+      confused: c.confused,
+      joinedSkills: c.joinedSkills,
+    }))
+  );
+
+  return {
+    ...data,
+    conversationResults,
+    byChatsView,
+  };
+}
 
 /** Never cache chat blobs — avoids stale JSON after POST. */
 export const dynamic = 'force-dynamic';
@@ -167,9 +216,17 @@ export async function POST(request: Request): Promise<NextResponse<ChatAnalysisR
 
     // Aggregate the individual conversation scores into daily dashboard data
     const aggregatedData = await aggregateDailyChatAnalysisResults(conversations, analysisDate);
-    
+
+    const toSave = applyJoinedSkillsFromRawIngest(aggregatedData, conversations);
+
+    console.log('[Chat Analysis API] Pre-save snapshot:', {
+      resultRows: toSave.conversationResults.length,
+      firstJoinedSkillsLen: toSave.conversationResults[0]?.joinedSkills?.length ?? 0,
+      byChatsTotalChats: toSave.byChatsView?.totalChats ?? 0,
+    });
+
     // Save to blob storage
-    await saveDailyChatAnalysisData(aggregatedData);
+    await saveDailyChatAnalysisData(toSave);
 
     return NextResponse.json({
       success: true,
