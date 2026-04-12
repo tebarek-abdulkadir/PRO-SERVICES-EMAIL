@@ -11,6 +11,7 @@ import type {
   AgentResponseTimeRecord
 } from './chat-types';
 import { computeByChatsViewMetrics, createEmptyByChatsViewMetrics } from './chat-by-chats-metrics';
+import { mergeJoinedSkillsFields } from './chat-joined-skills';
 
 const CHAT_BLOB_PREFIX = 'chat-analysis';
 const DELAY_BLOB_PREFIX = 'delay-time';
@@ -246,6 +247,7 @@ export async function aggregateDailyChatAnalysisResults(
       if (conv.maidId && !existing.maidId) existing.maidId = conv.maidId;
       if (conv.service && !existing.service) existing.service = conv.service;
       if (conv.skill && !existing.skill) existing.skill = conv.skill;
+      existing.joinedSkills = mergeJoinedSkillsFields(existing.joinedSkills, conv.joinedSkills);
       
     } else {
       // New conversation - use first conversation ID as key
@@ -323,6 +325,7 @@ export async function aggregateDailyChatAnalysisResults(
       if (!existing.clientId && conv.clientId) existing.clientId = conv.clientId;
       if (!existing.maidId && conv.maidId) existing.maidId = conv.maidId;
       if (!existing.contractId && conv.contractId) existing.contractId = conv.contractId;
+      existing.joinedSkills = mergeJoinedSkillsFields(existing.joinedSkills, conv.joinedSkills);
       
     } else {
       // New entity - add to map (use already merged conversation IDs from Step 0)
@@ -423,6 +426,7 @@ export async function aggregateDailyChatAnalysisResults(
       // Preserve flags
       existing.frustrated = existing.frustrated || entity.frustrated;
       existing.confused = existing.confused || entity.confused;
+      existing.joinedSkills = mergeJoinedSkillsFields(existing.joinedSkills, entity.joinedSkills);
       
       // Update conversation ID index
       convIds.forEach(id => conversationIdIndex.set(id, mergeKey!));
@@ -452,6 +456,7 @@ export async function aggregateDailyChatAnalysisResults(
         chatStartDateTime: entity.chatStartDateTime,
         service: entity.service,
         skill: entity.skill,
+        joinedSkills: entity.joinedSkills,
         clientId: entity.clientId,
         maidId: entity.maidId,
         contractId: entity.contractId,
@@ -497,6 +502,7 @@ export async function aggregateDailyChatAnalysisResults(
       const mergedPhrases = new Set([...(existing.keyPhrases || []), ...(conv.keyPhrases || [])]);
       
       // Keep the one with more data, but merge the flags and data
+      const mergedJoined = mergeJoinedSkillsFields(existing.joinedSkills, conv.joinedSkills);
       if (currentDataScore > existingDataScore) {
         conversationMap.set(conv.conversationId, {
           ...conv,
@@ -504,6 +510,7 @@ export async function aggregateDailyChatAnalysisResults(
           confused: mergedConfused,
           mainIssues: Array.from(mergedIssues),
           keyPhrases: Array.from(mergedPhrases),
+          joinedSkills: mergedJoined,
         });
       } else {
         // Keep existing but update flags and merge data
@@ -513,6 +520,7 @@ export async function aggregateDailyChatAnalysisResults(
           confused: mergedConfused,
           mainIssues: Array.from(mergedIssues),
           keyPhrases: Array.from(mergedPhrases),
+          joinedSkills: mergedJoined,
         });
       }
     }
@@ -564,6 +572,7 @@ export async function aggregateDailyChatAnalysisResults(
       // Preserve flags
       existing.frustrated = existing.frustrated || conv.frustrated;
       existing.confused = existing.confused || conv.confused;
+      existing.joinedSkills = mergeJoinedSkillsFields(existing.joinedSkills, conv.joinedSkills);
     } else {
       // New entry
       contentMergeMap.set(contentKey, {
@@ -668,6 +677,7 @@ export async function aggregateDailyChatAnalysisResults(
     analysisDate: conv.chatStartDateTime || new Date().toISOString(),
     service: conv.service,
     skill: conv.skill,
+    joinedSkills: conv.joinedSkills,
   }));
   
   // Log first result to verify service/skill are preserved

@@ -12,7 +12,10 @@ import {
   Headphones,
 } from 'lucide-react';
 import { dedupeChatConversationResults } from '@/lib/chat-email-metrics';
-import { createEmptyByChatsViewMetrics } from '@/lib/chat-by-chats-metrics';
+import {
+  computeByChatsViewMetrics,
+  createEmptyByChatsViewMetrics,
+} from '@/lib/chat-by-chats-metrics';
 import type { ChatAnalysisData, ChatTrendData } from '@/lib/chat-types';
 import DatePickerCalendar from '@/components/DatePickerCalendar';
 import ChatTrendChart from '@/components/ChatTrendChart';
@@ -208,7 +211,21 @@ export default function ChatsDashboard() {
   const confusionPercentage = data.overallMetrics.confusionPercentage;
   
   const deduplicatedArray = dedupeChatConversationResults(data.conversationResults);
-  const bc = data.byChatsView ?? createEmptyByChatsViewMetrics();
+  /** Prefer server `byChatsView`; if missing (old deploy/blob), recompute from stored joinedSkills on results. */
+  const bc =
+    data.byChatsView ??
+    (() => {
+      const rows = deduplicatedArray
+        .filter((r) => r.joinedSkills?.trim())
+        .map((r) => ({
+          conversationId: r.conversationId,
+          frustrated: r.frustrated,
+          confused: r.confused,
+          joinedSkills: r.joinedSkills,
+        }));
+      if (rows.length === 0) return createEmptyByChatsViewMetrics();
+      return computeByChatsViewMetrics(rows);
+    })();
 
   // Calculate additional metrics for display
   const bothFrustratedAndConfused = deduplicatedArray.filter(c => c.frustrated && c.confused).length;
@@ -594,12 +611,14 @@ export default function ChatsDashboard() {
             </div>
           )}
 
-          {!data.byChatsView && (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-              By Chats metrics are not stored for this date yet. Re-ingest with{' '}
-              <code className="rounded bg-white px-1">joinedSkills</code> so the API can compute segment metrics.
-            </div>
-          )}
+          {!data.byChatsView &&
+            !deduplicatedArray.some((r) => r.joinedSkills?.trim()) && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                By Chats metrics are not on file and <code className="rounded bg-white px-1">joinedSkills</code> is
+                missing from conversation rows. Deploy the latest API and re-ingest with{' '}
+                <code className="rounded bg-white px-1">joinedSkills</code>.
+              </div>
+            )}
         </div>
       )}
 
