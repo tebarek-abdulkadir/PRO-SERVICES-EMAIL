@@ -29,3 +29,27 @@ export function mergeJoinedSkillsFields(a?: string, b?: string): string {
   }
   return Array.from(parts).join(', ');
 }
+
+/**
+ * Reconstruct joinedSkills for a stored row from the original ingest rows (handles comma-separated ids).
+ * Use when merge steps drop `joinedSkills` on `conv` but POST body had it.
+ */
+export function mergeJoinedSkillsFromRawForMergedIds(
+  mergedConversationIdCsv: string,
+  rawRows: ReadonlyArray<{ conversationId: string; joinedSkills?: string }>
+): string {
+  const targetIds = new Set(
+    mergedConversationIdCsv.split(',').map((s) => s.trim()).filter(Boolean)
+  );
+  let acc: string | undefined;
+  for (const row of rawRows) {
+    if (!row.joinedSkills?.trim()) continue;
+    const rowIds = String(row.conversationId)
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!rowIds.some((id) => targetIds.has(id))) continue;
+    acc = mergeJoinedSkillsFields(acc, row.joinedSkills);
+  }
+  return acc ?? '';
+}

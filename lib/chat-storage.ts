@@ -11,7 +11,7 @@ import type {
   AgentResponseTimeRecord
 } from './chat-types';
 import { computeByChatsViewMetrics, createEmptyByChatsViewMetrics } from './chat-by-chats-metrics';
-import { mergeJoinedSkillsFields } from './chat-joined-skills';
+import { mergeJoinedSkillsFields, mergeJoinedSkillsFromRawForMergedIds } from './chat-joined-skills';
 
 const CHAT_BLOB_PREFIX = 'chat-analysis';
 const DELAY_BLOB_PREFIX = 'delay-time';
@@ -668,17 +668,21 @@ export async function aggregateDailyChatAnalysisResults(
 
   // Convert merged conversations to ChatAnalysisResult format for storage
   // Use mergedForResults to avoid duplicate entries in UI for same entity/content
-  const results: ChatAnalysisResult[] = mergedForResults.map(conv => ({
-    conversationId: conv.conversationId, // Already contains comma-separated IDs if merged
-    frustrated: conv.frustrated,
-    confused: conv.confused,
-    mainIssues: conv.mainIssues,
-    keyPhrases: conv.keyPhrases,
-    analysisDate: conv.chatStartDateTime || new Date().toISOString(),
-    service: conv.service,
-    skill: conv.skill,
-    joinedSkills: conv.joinedSkills,
-  }));
+  const results: ChatAnalysisResult[] = mergedForResults.map((conv) => {
+    const fromRawIngest = mergeJoinedSkillsFromRawForMergedIds(conv.conversationId, conversations);
+    const joinedSkillsMerged = mergeJoinedSkillsFields(conv.joinedSkills, fromRawIngest).trim();
+    return {
+      conversationId: conv.conversationId, // Already contains comma-separated IDs if merged
+      frustrated: conv.frustrated,
+      confused: conv.confused,
+      mainIssues: conv.mainIssues,
+      keyPhrases: conv.keyPhrases,
+      analysisDate: conv.chatStartDateTime || new Date().toISOString(),
+      service: conv.service,
+      skill: conv.skill,
+      ...(joinedSkillsMerged ? { joinedSkills: joinedSkillsMerged } : {}),
+    };
+  });
   
   // Log first result to verify service/skill are preserved
   if (results.length > 0) {

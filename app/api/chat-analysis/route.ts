@@ -1,6 +1,30 @@
 import { NextResponse } from 'next/server';
 import { saveDailyChatAnalysisData, aggregateDailyChatAnalysisResults, getLatestChatAnalysisData, getDailyChatAnalysisData } from '@/lib/chat-storage';
-import type { ChatAnalysisRequest, ChatAnalysisResponse, ChatAnalysisResult, ChatDataResponse } from '@/lib/chat-types';
+import { computeByChatsViewMetrics } from '@/lib/chat-by-chats-metrics';
+import type { ChatAnalysisData, ChatAnalysisRequest, ChatAnalysisResponse, ChatAnalysisResult, ChatDataResponse } from '@/lib/chat-types';
+
+/** Never cache chat blobs — avoids stale JSON after POST. */
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+/** Older blobs may omit byChatsView; compute on read when joinedSkills exists on rows. */
+function enrichChatDataForGet(data: ChatAnalysisData): ChatAnalysisData {
+  if (data.byChatsView != null) return data;
+  const rows =
+    data.conversationResults
+      ?.filter((r) => r.joinedSkills?.trim())
+      .map((r) => ({
+        conversationId: r.conversationId,
+        frustrated: r.frustrated,
+        confused: r.confused,
+        joinedSkills: r.joinedSkills!,
+      })) ?? [];
+  if (rows.length === 0) return data;
+  return {
+    ...data,
+    byChatsView: computeByChatsViewMetrics(rows),
+  };
+}
 
 /**
  * API Endpoint: /api/chat-analysis
@@ -236,10 +260,16 @@ export async function GET(request: Request): Promise<NextResponse<ChatDataRespon
       });
     }
 
-    return NextResponse.json({
-      success: true,
-      data,
-    });
+    const payload = enrichChatDataForGet(data);
+
+    return NextResponse.json(
+      { success: true, data: payload },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        },
+      }
+    );
 
   } catch (error) {
     console.error('[Chat Analysis API] GET error:', error);
