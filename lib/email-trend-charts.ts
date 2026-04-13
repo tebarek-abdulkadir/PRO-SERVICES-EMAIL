@@ -190,23 +190,33 @@ export function renderConversionTrendSvg(
 </svg>`;
 }
 
+export interface ChatRatesTrendSeries {
+  label: string;
+  values: (number | null)[];
+  color: string;
+}
+
+/**
+ * By Conversation trend: frustration & confusion as % of chats in section, split by initiator (client vs agent)
+ * and attribution (agent vs bot/system). Missing days produce gaps in lines.
+ */
 export function renderChatRatesTrendSvg(
   dates: string[],
-  frustration: (number | null)[],
-  confusion: (number | null)[],
+  series: ChatRatesTrendSeries[],
   title: string
 ): string {
   const W = 640;
-  const H = 420;
+  const H = 560;
   const padL = 58;
   const padR = 14;
   const padB = X_AXIS_PAD + 8;
-  const legendBlock = 44;
+  const legendRows = Math.ceil(Math.max(1, series.length) / 2);
+  const legendBlock = Math.max(100, legendRows * 22 + 20);
   const plotW = W - padL - padR;
   const plotH = H - PLOT_TOP - padB - legendBlock;
   const n = dates.length;
 
-  if (n === 0) {
+  if (n === 0 || series.length === 0) {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="120" viewBox="0 0 ${W} 120" role="img" aria-label="${esc(title)}">
   <text x="16" y="48" font-family="${FONT}" font-size="13" fill="${MUTED}">${esc('No data in this date range.')}</text>
 </svg>`;
@@ -235,65 +245,38 @@ export function renderChatRatesTrendSvg(
     );
   }
 
-  const pathFr = buildPath(frustration, xAt, yAt);
-  const pathCf = buildPath(confusion, xAt, yAt);
-
-  const lines: string[] = [];
-  if (pathFr) {
-    lines.push(
-      `<path d="${pathFr}" fill="none" stroke="#e74c3c" stroke-width="2.5" stroke-linecap="round"/>`
-    );
-  }
-  if (pathCf) {
-    lines.push(
-      `<path d="${pathCf}" fill="none" stroke="#3498db" stroke-width="2.5" stroke-linecap="round"/>`
-    );
-  }
-
-  const pointLabels: string[] = [];
-  const showPointLabels = n <= 12;
-  if (showPointLabels) {
-    for (let i = 0; i < n; i++) {
-      const fr = frustration[i];
-      if (fr !== null && fr !== undefined && !Number.isNaN(fr)) {
-        const cx = xAt(i);
-        const cy = yAt(fr);
-        pointLabels.push(
-          `<text x="${cx}" y="${cy - 12}" text-anchor="middle" font-size="8" font-weight="600" fill="#c0392b" font-family="${FONT}">${esc(fmtPct(fr))}</text>`
-        );
-      }
-    }
-    for (let i = 0; i < n; i++) {
-      const cf = confusion[i];
-      if (cf !== null && cf !== undefined && !Number.isNaN(cf)) {
-        const cx = xAt(i);
-        const cy = yAt(cf);
-        pointLabels.push(
-          `<text x="${cx}" y="${cy + 16}" text-anchor="middle" font-size="8" font-weight="600" fill="#2471a3" font-family="${FONT}">${esc(fmtPct(cf))}</text>`
-        );
-      }
+  const paths: string[] = [];
+  for (const s of series) {
+    const path = buildPath(s.values, xAt, yAt);
+    if (path) {
+      paths.push(
+        `<path d="${path}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`
+      );
     }
   }
 
-  const legendY = PLOT_TOP + plotH + 34;
-  const leg = `<g>
-  <rect x="${padL}" y="${legendY - 10}" width="12" height="12" fill="#e74c3c" stroke="#cccccc" stroke-width="0.5"/>
-  <text x="${padL + 18}" y="${legendY + 1}" font-size="12" font-weight="600" fill="${TEXT_FILL}" font-family="${FONT}">Frustration rate</text>
-  <rect x="${padL + 200}" y="${legendY - 10}" width="12" height="12" fill="#3498db" stroke="#cccccc" stroke-width="0.5"/>
-  <text x="${padL + 218}" y="${legendY + 1}" font-size="12" font-weight="600" fill="${TEXT_FILL}" font-family="${FONT}">Confusion rate</text>
+  const legendY = PLOT_TOP + plotH + 28;
+  const legendItems = series.map((s, idx) => {
+    const col = idx % 2;
+    const row = Math.floor(idx / 2);
+    const lx = padL + col * 310;
+    const ly = legendY + row * 22;
+    return `<g>
+  <rect x="${lx}" y="${ly - 9}" width="11" height="11" fill="${s.color}" stroke="#cccccc" stroke-width="0.5"/>
+  <text x="${lx + 16}" y="${ly + 1}" font-size="9" fill="${TEXT_FILL}" font-family="${FONT}">${esc(s.label)}</text>
 </g>`;
+  });
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}">
   <rect width="100%" height="100%" fill="#fafafa"/>
   <text x="${W / 2}" y="${TITLE_Y}" text-anchor="middle" font-size="14" font-weight="700" fill="${TEXT_FILL}" font-family="${FONT}">${esc(title)}</text>
-  <text x="${W / 2}" y="${SUBTITLE_Y}" text-anchor="middle" font-size="10" fill="${MUTED}" font-family="${FONT}">${esc('Y axis: percent (0–100%), every 5%')}</text>
+  <text x="${W / 2}" y="${SUBTITLE_Y}" text-anchor="middle" font-size="9" fill="${MUTED}" font-family="${FONT}">${esc('By Conversation: % of chats in section; client-initiated vs agent-initiated; attribution agent vs bot/system')}</text>
   <line x1="${padL}" y1="${PLOT_TOP + plotH}" x2="${padL + plotW}" y2="${PLOT_TOP + plotH}" stroke="#888888" stroke-width="1"/>
   <line x1="${padL}" y1="${PLOT_TOP}" x2="${padL}" y2="${PLOT_TOP + plotH}" stroke="#888888" stroke-width="1"/>
   ${gridLines.join('\n  ')}
   ${yLabels.join('\n  ')}
-  ${lines.join('\n  ')}
-  ${pointLabels.join('\n  ')}
+  ${paths.join('\n  ')}
   ${xLabels.join('\n  ')}
-  ${leg}
+  ${legendItems.join('\n  ')}
 </svg>`;
 }

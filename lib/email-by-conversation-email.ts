@@ -1,4 +1,7 @@
-import { computeByConversationViewFromResults } from '@/lib/chat-by-conversation-metrics';
+import {
+  computeByConversationViewFromResults,
+  createEmptyByConversationViewData,
+} from '@/lib/chat-by-conversation-metrics';
 import { getDailyChatAnalysisData } from '@/lib/chat-storage';
 import { mtdDateRange } from '@/lib/email-report-periods';
 import type { ChatAnalysisData, ConversationSectionMetrics } from '@/lib/chat-types';
@@ -122,10 +125,7 @@ export async function buildByConversationEmailPayload(
     throw new Error(`No chat analysis data for ${reportDate}`);
   }
 
-  const todayView = viewFromData(resolvedToday);
-  if (!todayView) {
-    throw new Error(`Chat analysis for ${reportDate} has no conversation rows for By Conversation metrics`);
-  }
+  const todayView = viewFromData(resolvedToday) ?? createEmptyByConversationViewData();
 
   const mtdDates = mtdDateRange(reportDate);
   const dailyData = await Promise.all(mtdDates.map((d) => getDailyChatAnalysisData(d)));
@@ -133,17 +133,22 @@ export async function buildByConversationEmailPayload(
   const consumerSections: ConversationSectionMetrics[] = [];
   const clientSections: ConversationSectionMetrics[] = [];
   const agentSections: ConversationSectionMetrics[] = [];
-  let mtdDaysWithChatData = 0;
 
   for (let i = 0; i < mtdDates.length; i++) {
     const data = dailyData[i];
     if (!data) continue;
     const v = viewFromData(data);
     if (!v) continue;
-    mtdDaysWithChatData++;
-    consumerSections.push(v.consumerInitiated);
-    clientSections.push(v.consumerInitiated);
-    agentSections.push(v.agentInitiated);
+    const ci = v.consumerInitiated;
+    const ai = v.agentInitiated;
+    /** MTD: skip missing blobs and days where a section has zero chats (excluded from sums and daily averages). */
+    if (ci.totalChats > 0) {
+      consumerSections.push(ci);
+      clientSections.push(ci);
+    }
+    if (ai.totalChats > 0) {
+      agentSections.push(ai);
+    }
   }
 
   const tot = consumerSections.reduce((s, c) => s + c.totalChats, 0);
@@ -170,7 +175,8 @@ export async function buildByConversationEmailPayload(
   };
 
   return {
-    mtdDaysWithChatData,
+    /** Days in MTD with ≥1 client-initiated chat (used for Bot Coverage pooled MTD). */
+    mtdDaysWithChatData: consumerSections.length,
     consumerBotCoverageToday: consumerSlice(todayView.consumerInitiated),
     consumerBotCoverageMtd: consumerMtd,
     clientInitiatedToday: initiatorRow(todayView.consumerInitiated),

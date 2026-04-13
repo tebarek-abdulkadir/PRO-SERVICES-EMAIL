@@ -346,7 +346,7 @@ export function renderDailyEmailText(report: DailyEmailReportData): string {
     `  See HTML for Bot Coverage and Client vs Agent initiator tables.`,
     '',
     '4. Trend charts (Apr 6 → report date, same year)',
-    `  ${report.trendCharts.rangeLabel} — ${report.trendCharts.dayCount} day(s). HTML includes PNG chart images (conversions per product; frustration & confusion).`,
+    `  ${report.trendCharts.rangeLabel} — ${report.trendCharts.dayCount} day(s). HTML includes PNG chart images (conversions per product; frustration & confusion by initiator/channel).`,
     '',
     `Generated for ${report.date} (${report.timezone}).`,
   ].join('\n');
@@ -403,7 +403,7 @@ export function renderDailyEmailHtml(
               <div style="margin:0 0 24px 0;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;">
                 ${trendChartImg(
                   report.trendCharts.chatRatesPng,
-                  `Frustration and confusion (${report.trendCharts.rangeLabel})`,
+                  `Frustration and confusion by initiator and channel (${report.trendCharts.rangeLabel})`,
                   chartImageMode,
                   EMAIL_TREND_CHAT_RATES_CID
                 )}

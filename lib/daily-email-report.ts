@@ -17,7 +17,11 @@ import {
   mtdDateRange,
 } from '@/lib/email-report-periods';
 import { loadEmailTrendSeries } from '@/lib/email-trend-data';
-import { renderChatRatesTrendSvg, renderConversionTrendSvg } from '@/lib/email-trend-charts';
+import {
+  renderChatRatesTrendSvg,
+  renderConversionTrendSvg,
+  type ChatRatesTrendSeries,
+} from '@/lib/email-trend-charts';
 import { trySvgToPngBuffer } from '@/lib/svg-to-png';
 import type { EmailSalesCcMvSplit, EnrichedProspectDetail } from '@/lib/prospects-report';
 import { getDashboardProspectsData } from '@/lib/prospects-report';
@@ -216,11 +220,21 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
     conversionSeries,
     `Daily conversion rate by product (${rangeLabel})`
   );
+  const b = trendSeries.chatBreakdown;
+  const chatBreakdownSeries: ChatRatesTrendSeries[] = [
+    { label: 'Fr. client init. · agent', values: b.frustrationClientByAgent, color: '#c0392b' },
+    { label: 'Fr. client init. · bot/sys', values: b.frustrationClientByBot, color: '#e59866' },
+    { label: 'Fr. agent init. · agent', values: b.frustrationAgentInitByAgent, color: '#922b21' },
+    { label: 'Fr. agent init. · bot/sys', values: b.frustrationAgentInitByBot, color: '#f5b7b1' },
+    { label: 'Cf. client init. · agent', values: b.confusionClientByAgent, color: '#1f618d' },
+    { label: 'Cf. client init. · bot/sys', values: b.confusionClientByBot, color: '#5dade2' },
+    { label: 'Cf. agent init. · agent', values: b.confusionAgentInitByAgent, color: '#154360' },
+    { label: 'Cf. agent init. · bot/sys', values: b.confusionAgentInitByBot, color: '#aed6f1' },
+  ];
   const chatRatesSvg = renderChatRatesTrendSvg(
     trendDates,
-    trendSeries.frustration,
-    trendSeries.confusion,
-    `Frustration & confusion (${rangeLabel})`
+    chatBreakdownSeries,
+    `Frustration & confusion — by initiator & channel (${rangeLabel})`
   );
 
   const convPng = trySvgToPngBuffer(conversionSvg);
