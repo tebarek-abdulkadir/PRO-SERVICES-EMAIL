@@ -1,6 +1,5 @@
-import { getChatEmailTableMetrics } from '@/lib/chat-email-metrics';
+import { buildByConversationEmailPayload, type ByConversationEmailPayload } from '@/lib/email-by-conversation-email';
 import { getDailyChatAnalysisData, getDailyDelayTimeData } from '@/lib/chat-storage';
-import { averageChatRatesForDateRange } from '@/lib/email-chat-mtd';
 import {
   buildServiceOverviewRows,
   formatServiceConversionRate,
@@ -68,23 +67,12 @@ export interface DailyEmailReportData {
   chatAnalysis: {
     available: boolean;
     averageResponseTime: string | null;
-    frustrationPercent: number;
-    confusionPercent: number;
-    /** Mean frustration % over MTD days that have chat analysis */
-    frustrationPercentMtdAvg: number;
-    confusionPercentMtdAvg: number;
-    chatMtdDaysCounted: number;
-    frustrationPercentLmAvg: number;
-    confusionPercentLmAvg: number;
-    chatLmDaysCounted: number;
-    totalChats: number;
-    /** Unique people with frustration (same as Chats page “Frustrated People”) */
-    frustratedClients: number;
-    frustratedChats: number;
-    /** Unique people with confusion (same as Chats page “Confused People”) */
-    confusedClients: number;
-    confusedChats: number;
+    /** Overall people-based rates (same blob as dashboard header), for logging / text fallback */
+    overallFrustrationPercent: number;
+    overallConfusionPercent: number;
   };
+  /** By Conversation tab metrics — section 3 tables */
+  byConversationEmail: ByConversationEmailPayload;
   /** Daily trends from Apr 6 through report date (same calendar year as report) */
   trendCharts: {
     rangeLabel: string;
@@ -202,15 +190,11 @@ async function getAverageResponseTime(date: string): Promise<string | null> {
 }
 
 export async function getDailyEmailReportData(date: string): Promise<DailyEmailReportData> {
-  const mtdDates = mtdDateRange(date);
-  const lmChatDates = lastMonthDateRange(date);
   const trendDates = emailTrendDateRange(date);
-  const [block, chatData, averageResponseTime, chatMtd, chatLm, trendSeries] = await Promise.all([
+  const [block, chatData, averageResponseTime, trendSeries] = await Promise.all([
     getProspectsAndSalesBlock(date),
     getDailyChatAnalysisData(date),
     getAverageResponseTime(date),
-    averageChatRatesForDateRange(mtdDates),
-    averageChatRatesForDateRange(lmChatDates),
     loadEmailTrendSeries(trendDates),
   ]);
 
@@ -218,8 +202,9 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
     throw new Error(`No chat analysis data available for ${date}`);
   }
 
+  const byConversationEmail = await buildByConversationEmailPayload(date, chatData);
+
   const m = chatData.overallMetrics;
-  const chatTable = getChatEmailTableMetrics(chatData);
 
   const rangeLabel = formatTrendRangeLabel(date);
   const conversionSeries = trendSeries.labels.map((label) => ({
@@ -259,20 +244,10 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
     chatAnalysis: {
       available: true,
       averageResponseTime,
-      frustrationPercent: m.frustrationPercentage || 0,
-      confusionPercent: m.confusionPercentage || 0,
-      frustrationPercentMtdAvg: chatMtd.frustrationPercentMtdAvg,
-      confusionPercentMtdAvg: chatMtd.confusionPercentMtdAvg,
-      chatMtdDaysCounted: chatMtd.chatMtdDaysCounted,
-      frustrationPercentLmAvg: chatLm.frustrationPercentMtdAvg,
-      confusionPercentLmAvg: chatLm.confusionPercentMtdAvg,
-      chatLmDaysCounted: chatLm.chatMtdDaysCounted,
-      totalChats: chatTable.totalChats,
-      frustratedClients: chatTable.frustratedClients,
-      frustratedChats: chatTable.frustratedChats,
-      confusedClients: chatTable.confusedClients,
-      confusedChats: chatTable.confusedChats,
+      overallFrustrationPercent: m.frustrationPercentage || 0,
+      overallConfusionPercent: m.confusionPercentage || 0,
     },
+    byConversationEmail,
     trendCharts: {
       rangeLabel,
       dayCount: trendDates.length,

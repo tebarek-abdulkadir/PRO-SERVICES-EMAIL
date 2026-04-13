@@ -19,9 +19,6 @@ function formatPercent(value: number): string {
 /** Em dash — (missing / TBD data) */
 const EM = '&#8212;';
 
-/** Chatbot coverage metrics are not wired yet */
-const CHATBOT_UNDER_DEVELOPMENT = 'Under Development';
-
 const font = "Segoe UI,Calibri,sans-serif";
 const thStyle = `padding:8px 10px;background:#4472c4;color:#fff;font-size:11px;font-weight:600;text-align:center;border:1px solid #bdc3c7;font-family:${font}`;
 const thLeft = `padding:8px 10px;background:#4472c4;color:#fff;font-size:11px;font-weight:600;text-align:left;border:1px solid #bdc3c7;font-family:${font}`;
@@ -173,77 +170,122 @@ function renderCsatReplyRateTable(): string {
     </table>`;
 }
 
-function renderChatMetricsTable(report: DailyEmailReportData): string {
-  const c = report.chatAnalysis;
+function fmtCountPct(count: number, pctVal: number): string {
+  return `${count} (${formatPercent(pctVal)})`;
+}
+
+function fmtScore(n: number | null): string {
+  if (n == null || Number.isNaN(n)) return EM;
+  return n.toFixed(2);
+}
+
+/** Table 1: Bot coverage — client-initiated (consumer) chats only; matches By Conversation dashboard. */
+function renderBotCoverageByConversationTable(report: DailyEmailReportData): string {
+  const colToday = escapeHtml(report.columnLabelShort);
+  const b = report.byConversationEmail;
+  const t = b.consumerBotCoverageToday;
+  const m = b.consumerBotCoverageMtd;
+  const mtdNote =
+    b.mtdDaysWithChatData > 0
+      ? `MTD sums/averages use ${b.mtdDaysWithChatData} day(s) in this month with saved chat data; calendar days without data are omitted.`
+      : 'No MTD data.';
 
   return `
-    <table role="presentation" width="100%" style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:560px;margin:0 0 16px 0;mso-table-lspace:0pt;mso-table-rspace:0pt;" cellspacing="0" cellpadding="0">
+    <div style="margin:0 0 8px 0;font-family:${font}">
+      <div style="font-size:16px;font-weight:bold;color:#2c3e50;">Bot Coverage</div>
+      <div style="font-size:11px;color:#5f6368;margin-top:4px;line-height:1.4;">
+        <span style="font-weight:600;">(Only Client Initiated Chats)</span> — All metrics in this table count only conversations where the initiator is Consumer or Bot (same rules as the dashboard &quot;By Conversation&quot; → Consumer Initiated block).
+      </div>
+      <div style="font-size:10px;color:#757575;margin-top:6px;">${escapeHtml(mtdNote)}</div>
+    </div>
+    <table role="presentation" width="100%" style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:720px;margin:0 0 24px 0;mso-table-lspace:0pt;mso-table-rspace:0pt;" cellspacing="0" cellpadding="0">
       <thead>
         <tr>
-          <th style="${thStyle}">Total Chats</th>
-          <th style="${thStyle}">Frustrated Clients</th>
-          <th style="${thStyle}">Frustrated Chats</th>
-          <th style="${thStyle}">Confused Clients</th>
-          <th style="${thStyle}">Confused Chats</th>
-          <th style="${thStyle}">Chats Covered by Chatbot</th>
-          <th style="${thStyle}">Coverage Rate</th>
+          <th style="${thStyle}" colspan="2">Total Chats</th>
+          <th style="${thStyle}" colspan="2">Bot Coverage (Bot Involved)</th>
+          <th style="${thStyle}" colspan="2">Fully Handled By Bot</th>
+          <th style="${thStyle}" colspan="2">Has At Least 1 Agent Message</th>
+        </tr>
+        <tr>
+          <th style="${thStyle}">${colToday}</th>
+          <th style="${thStyle}">MTD</th>
+          <th style="${thStyle}">${colToday}</th>
+          <th style="${thStyle}">MTD</th>
+          <th style="${thStyle}">${colToday}</th>
+          <th style="${thStyle}">MTD</th>
+          <th style="${thStyle}">${colToday}</th>
+          <th style="${thStyle}">MTD</th>
         </tr>
       </thead>
       <tbody>
         <tr style="background:#fff">
-          <td style="${tdBase};text-align:center">${c.totalChats}</td>
-          <td style="${tdBase};text-align:center">${c.frustratedClients}</td>
-          <td style="${tdBase};text-align:center">${c.frustratedChats}</td>
-          <td style="${tdBase};text-align:center">${c.confusedClients}</td>
-          <td style="${tdBase};text-align:center">${c.confusedChats}</td>
-          <td style="${tdBase};text-align:center">${escapeHtml(CHATBOT_UNDER_DEVELOPMENT)}</td>
-          <td style="${tdBase};text-align:center">${escapeHtml(CHATBOT_UNDER_DEVELOPMENT)}</td>
+          <td style="${tdBase};text-align:center">${t.totalChats}</td>
+          <td style="${tdBase};text-align:center">${m.totalChats}</td>
+          <td style="${tdBase};text-align:center">${t.botCoverageCount} (${formatPercent(t.botCoveragePct)})</td>
+          <td style="${tdBase};text-align:center">${m.botCoverageCount} (${formatPercent(m.botCoveragePct)})</td>
+          <td style="${tdBase};text-align:center">${fmtCountPct(t.fullyBotCount, t.fullyBotPct)}</td>
+          <td style="${tdBase};text-align:center">${fmtCountPct(m.fullyBotCount, m.fullyBotPct)}</td>
+          <td style="${tdBase};text-align:center">${fmtCountPct(t.atLeastOneAgentCount, t.atLeastOneAgentPct)}</td>
+          <td style="${tdBase};text-align:center">${fmtCountPct(m.atLeastOneAgentCount, m.atLeastOneAgentPct)}</td>
         </tr>
       </tbody>
     </table>`;
 }
 
-function renderChatSummaryTable(report: DailyEmailReportData): string {
-  const col = escapeHtml(report.columnLabelShort);
-  const fr = escapeHtml(formatPercent(report.chatAnalysis.frustrationPercent));
-  const frm = escapeHtml(formatPercent(report.chatAnalysis.frustrationPercentMtdAvg));
-  const frl = escapeHtml(formatPercent(report.chatAnalysis.frustrationPercentLmAvg));
-  const cr = escapeHtml(formatPercent(report.chatAnalysis.confusionPercent));
-  const crm = escapeHtml(formatPercent(report.chatAnalysis.confusionPercentMtdAvg));
-  const crl = escapeHtml(formatPercent(report.chatAnalysis.confusionPercentLmAvg));
-  const mtdN = report.chatAnalysis.chatMtdDaysCounted;
-  const lmN = report.chatAnalysis.chatLmDaysCounted;
-  const ud = escapeHtml(CHATBOT_UNDER_DEVELOPMENT);
+function renderInitiatorComparisonTable(report: DailyEmailReportData): string {
+  const colToday = escapeHtml(report.columnLabelShort);
+  const b = report.byConversationEmail;
+
+  function row(label: string, today: typeof b.clientInitiatedToday, mtd: typeof b.clientInitiatedMtd): string {
+    return `
+        <tr style="background:#fff">
+          <td style="${tdBase};font-weight:600">${escapeHtml(label)}</td>
+          <td style="${tdBase};text-align:center">${today.totalChats}</td>
+          <td style="${tdBase};text-align:center">${mtd.totalChats}</td>
+          <td style="${tdBase};text-align:center">${fmtCountPct(today.frustratedByBotCount, today.frustratedByBotPct)}</td>
+          <td style="${tdBase};text-align:center">${fmtCountPct(mtd.frustratedByBotCount, mtd.frustratedByBotPct)}</td>
+          <td style="${tdBase};text-align:center">${fmtCountPct(today.frustratedByAgentCount, today.frustratedByAgentPct)}</td>
+          <td style="${tdBase};text-align:center">${fmtCountPct(mtd.frustratedByAgentCount, mtd.frustratedByAgentPct)}</td>
+          <td style="${tdBase};text-align:center">${fmtCountPct(today.confusedByBotCount, today.confusedByBotPct)}</td>
+          <td style="${tdBase};text-align:center">${fmtCountPct(mtd.confusedByBotCount, mtd.confusedByBotPct)}</td>
+          <td style="${tdBase};text-align:center">${fmtCountPct(today.confusedByAgentCount, today.confusedByAgentPct)}</td>
+          <td style="${tdBase};text-align:center">${fmtCountPct(mtd.confusedByAgentCount, mtd.confusedByAgentPct)}</td>
+          <td style="${tdBase};text-align:center">${fmtScore(today.agentScoreAvg)}</td>
+          <td style="${tdBase};text-align:center">${fmtScore(mtd.agentScoreAvg)}</td>
+        </tr>`;
+  }
 
   return `
-    <table role="presentation" width="100%" style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:480px;margin:0 0 16px 0;mso-table-lspace:0pt;mso-table-rspace:0pt;" cellspacing="0" cellpadding="0">
+    <div style="margin:0 0 8px 0;font-size:14px;font-weight:bold;color:#2c3e50;font-family:${font}">By initiator (By Conversation)</div>
+    <table role="presentation" width="100%" style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:960px;margin:0 0 24px 0;mso-table-lspace:0pt;mso-table-rspace:0pt;" cellspacing="0" cellpadding="0">
       <thead>
         <tr>
-          <th style="${thLeft}">Summary</th>
-          <th style="${thStyle}">${col} (daily)</th>
-          <th style="${thStyle}">MTD Daily Avg${mtdN > 0 ? ` (${mtdN}d)` : ''}</th>
-          <th style="${thStyle}">LM avg${lmN > 0 ? ` (${lmN}d)` : ''}</th>
+          <th style="${thLeft}" rowspan="2">Initiator</th>
+          <th style="${thStyle}" colspan="2">Total Chats</th>
+          <th style="${thStyle}" colspan="2">Frustrated By Bot</th>
+          <th style="${thStyle}" colspan="2">Frustrated By Agent</th>
+          <th style="${thStyle}" colspan="2">Confused By Bot</th>
+          <th style="${thStyle}" colspan="2">Confused By Agent</th>
+          <th style="${thStyle}" colspan="2">Agent Score (avg)</th>
+        </tr>
+        <tr>
+          <th style="${thStyle}">${colToday}</th>
+          <th style="${thStyle}">MTD</th>
+          <th style="${thStyle}">${colToday}</th>
+          <th style="${thStyle}">MTD</th>
+          <th style="${thStyle}">${colToday}</th>
+          <th style="${thStyle}">MTD</th>
+          <th style="${thStyle}">${colToday}</th>
+          <th style="${thStyle}">MTD</th>
+          <th style="${thStyle}">${colToday}</th>
+          <th style="${thStyle}">MTD</th>
+          <th style="${thStyle}">${colToday}</th>
+          <th style="${thStyle}">MTD</th>
         </tr>
       </thead>
       <tbody>
-        <tr style="background:#fff">
-          <td style="${tdBase}">Frustration Rate</td>
-          <td style="${tdBase};text-align:center">${fr}</td>
-          <td style="${tdBase};text-align:center">${frm}</td>
-          <td style="${tdBase};text-align:center">${frl}</td>
-        </tr>
-        <tr style="background:#f9fafb">
-          <td style="${tdBase}">Confusion Rate</td>
-          <td style="${tdBase};text-align:center">${cr}</td>
-          <td style="${tdBase};text-align:center">${crm}</td>
-          <td style="${tdBase};text-align:center">${crl}</td>
-        </tr>
-        <tr style="background:#fff">
-          <td style="${tdBase}">Chatbot Coverage</td>
-          <td style="${tdBase};text-align:center">${ud}</td>
-          <td style="${tdBase};text-align:center">${ud}</td>
-          <td style="${tdBase};text-align:center">${ud}</td>
-        </tr>
+        ${row('Client Initiated Chats', b.clientInitiatedToday, b.clientInitiatedMtd)}
+        ${row('Agent Initiated Chats', b.agentInitiatedToday, b.agentInitiatedMtd)}
       </tbody>
     </table>`;
 }
@@ -298,15 +340,10 @@ export function renderDailyEmailText(report: DailyEmailReportData): string {
     '2. CSAT & Reply Rate',
     '  (data pending —)',
     '',
-    '3. Chat Analysis',
-    `  Total chats: ${report.chatAnalysis.totalChats}`,
-    `  Frustrated clients: ${report.chatAnalysis.frustratedClients}`,
-    `  Frustrated chats: ${report.chatAnalysis.frustratedChats}`,
-    `  Confused clients: ${report.chatAnalysis.confusedClients}`,
-    `  Confused chats: ${report.chatAnalysis.confusedChats}`,
-    `  Frustration rate daily: ${formatPercent(report.chatAnalysis.frustrationPercent)} | MTD Daily Avg (${report.chatAnalysis.chatMtdDaysCounted}d): ${formatPercent(report.chatAnalysis.frustrationPercentMtdAvg)} | LM avg (${report.chatAnalysis.chatLmDaysCounted}d): ${formatPercent(report.chatAnalysis.frustrationPercentLmAvg)}`,
-    `  Confusion rate daily: ${formatPercent(report.chatAnalysis.confusionPercent)} | MTD Daily Avg: ${formatPercent(report.chatAnalysis.confusionPercentMtdAvg)} | LM avg: ${formatPercent(report.chatAnalysis.confusionPercentLmAvg)}`,
-    `  Chatbot coverage: ${CHATBOT_UNDER_DEVELOPMENT} (all columns)`,
+    '3. Chat Analysis (By Conversation)',
+    `  Overall frustration (people): ${formatPercent(report.chatAnalysis.overallFrustrationPercent)} | confusion: ${formatPercent(report.chatAnalysis.overallConfusionPercent)}`,
+    `  Bot coverage table — client-initiated only. MTD days counted: ${report.byConversationEmail.mtdDaysWithChatData}`,
+    `  See HTML for Bot Coverage and Client vs Agent initiator tables.`,
     '',
     '4. Trend charts (Apr 6 → report date, same year)',
     `  ${report.trendCharts.rangeLabel} — ${report.trendCharts.dayCount} day(s). HTML includes PNG chart images (conversions per product; frustration & confusion).`,
@@ -349,8 +386,8 @@ export function renderDailyEmailHtml(
               ${sectionTitle('2', 'CSAT & Reply Rate')}
               ${renderCsatReplyRateTable()}
               ${sectionTitle('3', 'Chat Analysis')}
-              ${renderChatMetricsTable(report)}
-              ${renderChatSummaryTable(report)}
+              ${renderBotCoverageByConversationTable(report)}
+              ${renderInitiatorComparisonTable(report)}
               ${sectionTitle('4', 'Trend charts (from Apr 6)')}
               <div style="margin:0 0 8px 0;font-size:12px;color:#424242;">
                 Daily series through ${escapeHtml(report.trendCharts.rangeLabel)} (${report.trendCharts.dayCount} day${report.trendCharts.dayCount === 1 ? '' : 's'}). Missing days leave gaps in the lines.

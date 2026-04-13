@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
         totalProspects: report.prospects.total,
         totalSales: report.prospects.totalSales,
         totalConversionRate: report.prospects.totalConversionRate,
-        frustrationPercent: report.chatAnalysis.frustrationPercent,
+        frustrationPercent: report.chatAnalysis.overallFrustrationPercent,
         averageResponseTime: report.chatAnalysis.averageResponseTime,
       },
     });

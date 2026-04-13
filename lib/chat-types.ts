@@ -36,6 +36,12 @@ export interface ConversationSectionMetrics {
   frustrationByAgentPct: number;
   frustrationByBotOrSystemCount: number;
   frustrationByBotOrSystemPct: number;
+  confusionCount: number;
+  confusionPct: number;
+  confusionByAgentCount: number;
+  confusionByAgentPct: number;
+  confusionByBotOrSystemCount: number;
+  confusionByBotOrSystemPct: number;
   agentScoreAvg: number | null;
   chatbotCoverageCount: number;
   chatbotCoveragePct: number;

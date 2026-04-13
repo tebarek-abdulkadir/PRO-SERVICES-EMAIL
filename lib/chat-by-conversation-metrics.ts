@@ -37,6 +37,12 @@ function emptySection(): ConversationSectionMetrics {
     frustrationByAgentPct: 0,
     frustrationByBotOrSystemCount: 0,
     frustrationByBotOrSystemPct: 0,
+    confusionCount: 0,
+    confusionPct: 0,
+    confusionByAgentCount: 0,
+    confusionByAgentPct: 0,
+    confusionByBotOrSystemCount: 0,
+    confusionByBotOrSystemPct: 0,
     agentScoreAvg: null,
     chatbotCoverageCount: 0,
     chatbotCoveragePct: 0,
@@ -59,6 +65,9 @@ function computeSection(
   let frustrationCount = 0;
   let frAgent = 0;
   let frBot = 0;
+  let confusionCount = 0;
+  let confAgent = 0;
+  let confBot = 0;
   const scores: number[] = [];
   let cov = 0;
   let fully = 0;
@@ -71,6 +80,14 @@ function computeSection(
       const fb = norm(r.frustratedBy);
       if (fb === 'agent') frAgent++;
       else if (fb === 'bot' || fb === 'system') frBot++;
+    }
+
+    if (r.confused) confusionCount++;
+
+    if (r.confused) {
+      const cb = norm(r.confusedBy);
+      if (cb === 'agent') confAgent++;
+      else if (cb === 'bot' || cb === 'system') confBot++;
     }
 
     if (r.agentScore != null && typeof r.agentScore === 'number' && Number.isFinite(r.agentScore)) {
@@ -93,6 +110,13 @@ function computeSection(
   out.frustrationByAgentPct = pct(frAgent, total);
   out.frustrationByBotOrSystemCount = frBot;
   out.frustrationByBotOrSystemPct = pct(frBot, total);
+
+  out.confusionCount = confusionCount;
+  out.confusionPct = pct(confusionCount, total);
+  out.confusionByAgentCount = confAgent;
+  out.confusionByAgentPct = pct(confAgent, total);
+  out.confusionByBotOrSystemCount = confBot;
+  out.confusionByBotOrSystemPct = pct(confBot, total);
 
   if (scores.length > 0) {
     out.agentScoreAvg = scores.reduce((a, b) => a + b, 0) / scores.length;

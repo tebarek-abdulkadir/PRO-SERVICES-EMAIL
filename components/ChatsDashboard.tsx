@@ -55,7 +55,6 @@ function ConversationInitiatorBlock({
           <div className="mt-auto">
             <div className="text-3xl font-bold text-slate-900 mb-1">{m.totalChats}</div>
             <div className="text-sm font-medium text-slate-600">Total Chats</div>
-            <div className="text-xs text-slate-500 mt-2">Deduped by conversation id</div>
           </div>
         </div>
 
@@ -67,7 +66,6 @@ function ConversationInitiatorBlock({
           <div className="mt-auto">
             <div className="text-3xl font-bold text-slate-900 mb-1">{m.frustrationCount}</div>
             <div className="text-sm font-medium text-slate-600">Frustration</div>
-            <div className="text-xs text-slate-500 mt-2">of chats in this section</div>
           </div>
         </div>
 
@@ -79,7 +77,6 @@ function ConversationInitiatorBlock({
           <div className="mt-auto">
             <div className="text-3xl font-bold text-slate-900 mb-1">{m.frustrationByAgentCount}</div>
             <div className="text-sm font-medium text-slate-600">Frustration caused by Agent</div>
-            <div className="text-xs text-slate-500 mt-2">frustrated + frustratedBy agent</div>
           </div>
         </div>
       </div>
@@ -93,7 +90,6 @@ function ConversationInitiatorBlock({
           <div className="mt-auto">
             <div className="text-3xl font-bold text-slate-900 mb-1">{m.frustrationByBotOrSystemCount}</div>
             <div className="text-sm font-medium text-slate-600">Frustration caused by Bot / System</div>
-            <div className="text-xs text-slate-500 mt-2">frustrated + frustratedBy bot or system</div>
           </div>
         </div>
 
@@ -104,7 +100,6 @@ function ConversationInitiatorBlock({
           <div className="mt-auto">
             <div className="text-3xl font-bold text-slate-900 mb-1">{formatAvg(m.agentScoreAvg)}</div>
             <div className="text-sm font-medium text-slate-600">Agent score</div>
-            <div className="text-xs text-slate-500 mt-2">Non-null scores only</div>
           </div>
         </div>
 
@@ -115,11 +110,8 @@ function ConversationInitiatorBlock({
         <div className="space-y-3 pt-2">
           <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
             <Bot className="w-5 h-5 text-violet-600" />
-            Chatbot & routing (joinedSkills)
+            Chatbot metrics
           </h3>
-          <p className="text-sm text-slate-500">
-            Same bot/agent token rules as the By People tab (e.g. GPT_VBC_SALES / VBC_SALES_AGENTS).
-          </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white rounded-xl p-6 border-2 border-violet-100 shadow-sm">
               <div className="flex items-center justify-between mb-2">
@@ -128,7 +120,6 @@ function ConversationInitiatorBlock({
               </div>
               <div className="text-3xl font-bold text-slate-900">{m.chatbotCoverageCount}</div>
               <div className="text-sm font-medium text-slate-600 mt-1">Chatbot coverage</div>
-              <div className="text-xs text-slate-500 mt-1">Bot skills in joinedSkills</div>
             </div>
             <div className="bg-white rounded-xl p-6 border-2 border-violet-100 shadow-sm">
               <div className="flex items-center justify-between mb-2">
@@ -137,7 +128,6 @@ function ConversationInitiatorBlock({
               </div>
               <div className="text-3xl font-bold text-slate-900">{m.fullyBotCount}</div>
               <div className="text-sm font-medium text-slate-600 mt-1">Chats fully handled by bot</div>
-              <div className="text-xs text-slate-500 mt-1">Bot tokens, no agent tokens</div>
             </div>
             <div className="bg-white rounded-xl p-6 border-2 border-emerald-100 shadow-sm">
               <div className="flex items-center justify-between mb-2">
@@ -146,7 +136,6 @@ function ConversationInitiatorBlock({
               </div>
               <div className="text-3xl font-bold text-slate-900">{m.atLeastOneAgentMessageCount}</div>
               <div className="text-sm font-medium text-slate-600 mt-1">Chats with ≥1 agent message</div>
-              <div className="text-xs text-slate-500 mt-1">Agent skill tokens in joinedSkills</div>
             </div>
           </div>
         </div>
