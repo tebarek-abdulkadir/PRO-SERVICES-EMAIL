@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { saveDailyChatAnalysisData, aggregateDailyChatAnalysisResults, getLatestChatAnalysisData, getDailyChatAnalysisData } from '@/lib/chat-storage';
 import { computeByChatsViewMetrics } from '@/lib/chat-by-chats-metrics';
+import { computeByConversationViewFromResults } from '@/lib/chat-by-conversation-metrics';
 import {
   buildJoinedSkillsLookupMap,
   mergeJoinedSkillsFields,
@@ -12,6 +13,11 @@ import {
   resolveEntityFieldsForMergedIds,
   type RawIngestEntityFields,
 } from '@/lib/chat-ingest-raw-fields';
+import {
+  buildChatMetaLookupMap,
+  resolveChatMetaForMergedIds,
+  type RawChatMetaRow,
+} from '@/lib/chat-conversation-meta-ingest';
 import type { ChatAnalysisData, ChatAnalysisRequest, ChatAnalysisResponse, ChatAnalysisResult, ChatDataResponse } from '@/lib/chat-types';
 
 type RawIngestRow = {
@@ -19,13 +25,23 @@ type RawIngestRow = {
   frustrated: boolean;
   confused: boolean;
   joinedSkills?: string;
+  initiator?: string;
+  frustratedBy?: string;
+  confusedBy?: string;
+  agentScore?: number | null;
 } & RawIngestEntityFields;
 
+function parseAgentScore(v: unknown): number | null {
+  if (v == null || v === '') return null;
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 /**
- * After aggregation, re-apply joinedSkills, entity fields, and byChatsView from the normalized POST body only.
- * This cannot be dropped by entity/content merge inside chat-storage.
+ * After aggregation, re-apply joinedSkills, entity fields, conversation meta, byChatsView, and byConversationView
+ * from the normalized POST body. This cannot be dropped by entity/content merge inside chat-storage.
  */
-function applyRawIngestPostProcessing(
+function applyChatAnalysisFromRawIngest(
   data: ChatAnalysisData,
   rawRows: RawIngestRow[]
 ): ChatAnalysisData {
@@ -45,6 +61,19 @@ function applyRawIngestPostProcessing(
     }))
   );
 
+  const metaLookup = buildChatMetaLookupMap(
+    rawRows.map(
+      (r): RawChatMetaRow => ({
+        conversationId: String(r.conversationId),
+        frustrated: r.frustrated,
+        initiator: r.initiator,
+        frustratedBy: r.frustratedBy,
+        confusedBy: r.confusedBy,
+        agentScore: r.agentScore,
+      })
+    )
+  );
+
   const conversationResults: ChatAnalysisResult[] = data.conversationResults.map((r) => {
     const idCsv = String(r.conversationId);
     const fromRawJoined = resolveJoinedSkillsForMergedIds(idCsv, joinedLookup);
@@ -58,6 +87,7 @@ function applyRawIngestPostProcessing(
       maidName: entity.maidName || r.maidName,
       contractType: entity.contractType || r.contractType,
     };
+    const meta = resolveChatMetaForMergedIds(idCsv, metaLookup);
     return {
       ...r,
       ...(joinedSkills ? { joinedSkills } : {}),
@@ -67,6 +97,10 @@ function applyRawIngestPostProcessing(
       ...(mergedEntity.clientName ? { clientName: mergedEntity.clientName } : {}),
       ...(mergedEntity.maidName ? { maidName: mergedEntity.maidName } : {}),
       ...(mergedEntity.contractType ? { contractType: mergedEntity.contractType } : {}),
+      ...(meta.initiator ? { initiator: meta.initiator } : {}),
+      ...(meta.frustratedBy ? { frustratedBy: meta.frustratedBy } : {}),
+      ...(meta.confusedBy ? { confusedBy: meta.confusedBy } : {}),
+      ...(meta.agentScore != null ? { agentScore: meta.agentScore } : {}),
     };
   });
 
@@ -79,10 +113,13 @@ function applyRawIngestPostProcessing(
     }))
   );
 
+  const byConversationView = computeByConversationViewFromResults(conversationResults);
+
   return {
     ...data,
     conversationResults,
     byChatsView,
+    byConversationView,
   };
 }
 
@@ -90,23 +127,30 @@ function applyRawIngestPostProcessing(
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-/** Older blobs may omit byChatsView; compute on read when joinedSkills exists on rows. */
+/** Older blobs may omit byChatsView / byConversationView; compute on read when possible. */
 function enrichChatDataForGet(data: ChatAnalysisData): ChatAnalysisData {
-  if (data.byChatsView != null) return data;
-  const rows =
-    data.conversationResults
-      ?.filter((r) => r.joinedSkills?.trim())
-      .map((r) => ({
-        conversationId: r.conversationId,
-        frustrated: r.frustrated,
-        confused: r.confused,
-        joinedSkills: r.joinedSkills!,
-      })) ?? [];
-  if (rows.length === 0) return data;
-  return {
-    ...data,
-    byChatsView: computeByChatsViewMetrics(rows),
-  };
+  let next = data;
+  if (data.byChatsView == null) {
+    const rows =
+      data.conversationResults
+        ?.filter((r) => r.joinedSkills?.trim())
+        .map((r) => ({
+          conversationId: r.conversationId,
+          frustrated: r.frustrated,
+          confused: r.confused,
+          joinedSkills: r.joinedSkills!,
+        })) ?? [];
+    if (rows.length > 0) {
+      next = { ...next, byChatsView: computeByChatsViewMetrics(rows) };
+    }
+  }
+  if (next.byConversationView == null && next.conversationResults?.length) {
+    next = {
+      ...next,
+      byConversationView: computeByConversationViewFromResults(next.conversationResults),
+    };
+  }
+  return next;
 }
 
 /**
@@ -234,6 +278,12 @@ export async function POST(request: Request): Promise<NextResponse<ChatAnalysisR
             : undefined;
 
       const entity = pickEntityFieldsFromRawRow(conv);
+      const rec = conv as Record<string, unknown>;
+      const str = (k: string) => {
+        const v = rec[k] ?? rec[k.toLowerCase()];
+        if (v == null || v === '') return undefined;
+        return String(v).trim();
+      };
 
       return {
         conversationId: String(conv.conversationId),
@@ -251,18 +301,23 @@ export async function POST(request: Request): Promise<NextResponse<ChatAnalysisR
         maidName: entity.maidName,
         clientName: entity.clientName,
         contractType: entity.contractType,
+        initiator: str('initiator') ?? str('Initiator'),
+        frustratedBy: str('frustratedBy') ?? str('frustrated_by') ?? str('FrustratedBy'),
+        confusedBy: str('confusedBy') ?? str('confused_by') ?? str('ConfusedBy'),
+        agentScore: parseAgentScore(rec.agentScore ?? rec.AgentScore ?? rec.agent_score),
       };
     });
 
     // Aggregate the individual conversation scores into daily dashboard data
     const aggregatedData = await aggregateDailyChatAnalysisResults(conversations, analysisDate);
 
-    const toSave = applyRawIngestPostProcessing(aggregatedData, conversations);
+    const toSave = applyChatAnalysisFromRawIngest(aggregatedData, conversations);
 
     console.log('[Chat Analysis API] Pre-save snapshot:', {
       resultRows: toSave.conversationResults.length,
       firstJoinedSkillsLen: toSave.conversationResults[0]?.joinedSkills?.length ?? 0,
       byChatsTotalChats: toSave.byChatsView?.totalChats ?? 0,
+      byConvConsumer: toSave.byConversationView?.consumerInitiated.totalChats ?? 0,
     });
 
     // Save to blob storage

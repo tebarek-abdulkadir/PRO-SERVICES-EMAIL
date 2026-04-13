@@ -11,6 +11,7 @@ import type {
   AgentResponseTimeRecord
 } from './chat-types';
 import { computeByChatsViewMetrics, createEmptyByChatsViewMetrics } from './chat-by-chats-metrics';
+import { createEmptyByConversationViewData } from './chat-by-conversation-metrics';
 import {
   buildJoinedSkillsLookupMap,
   mergeJoinedSkillsFields,
@@ -798,6 +799,7 @@ function createEmptyChatAnalysisData(analysisDate: string): ChatAnalysisData {
     lastUpdated: new Date().toISOString(),
     analysisDate,
     byChatsView: createEmptyByChatsViewMetrics(),
+    byConversationView: createEmptyByConversationViewData(),
     overallMetrics: {
       frustratedCount: 0,
       frustrationPercentage: 0,
