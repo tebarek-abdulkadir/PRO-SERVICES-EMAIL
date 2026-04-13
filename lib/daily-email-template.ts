@@ -194,7 +194,7 @@ function renderBotCoverageByConversationTable(report: DailyEmailReportData): str
     <div style="margin:0 0 8px 0;font-family:${font}">
       <div style="font-size:16px;font-weight:bold;color:#2c3e50;">Bot Coverage</div>
       <div style="font-size:11px;color:#5f6368;margin-top:4px;line-height:1.4;">
-        <span style="font-weight:600;">(Only Client Initiated Chats)</span> — All metrics in this table count only conversations where the initiator is Consumer or Bot (same rules as the dashboard &quot;By Conversation&quot; → Consumer Initiated block).
+        <span style="font-weight:600;">(Only Client Initiated Chats)</span> — All metrics in this table count only conversations where the initiator is Consumer
       </div>
       <div style="font-size:10px;color:#757575;margin-top:6px;">${escapeHtml(mtdNote)}</div>
     </div>
@@ -345,8 +345,8 @@ export function renderDailyEmailText(report: DailyEmailReportData): string {
     `  Bot coverage table — client-initiated only. MTD days counted: ${report.byConversationEmail.mtdDaysWithChatData}`,
     `  See HTML for Bot Coverage and Client vs Agent initiator tables.`,
     '',
-    '4. Trend charts (Apr 6 → report date, same year)',
-    `  ${report.trendCharts.rangeLabel} — ${report.trendCharts.dayCount} day(s). HTML includes PNG chart images (conversions per product; frustration & confusion by initiator/channel).`,
+    '4. Trend charts (same year)',
+    `  Conversions: ${report.trendCharts.rangeLabel} (${report.trendCharts.dayCount}d). Chat breakdown: ${report.trendCharts.chatTrendRangeLabel} (${report.trendCharts.chatTrendDayCount}d). HTML includes PNGs.`,
     '',
     `Generated for ${report.date} (${report.timezone}).`,
   ].join('\n');
@@ -388,9 +388,9 @@ export function renderDailyEmailHtml(
               ${sectionTitle('3', 'Chat Analysis')}
               ${renderBotCoverageByConversationTable(report)}
               ${renderInitiatorComparisonTable(report)}
-              ${sectionTitle('4', 'Trend charts (from Apr 6)')}
+              ${sectionTitle('4', 'Trend charts')}
               <div style="margin:0 0 8px 0;font-size:12px;color:#424242;">
-                Daily series through ${escapeHtml(report.trendCharts.rangeLabel)} (${report.trendCharts.dayCount} day${report.trendCharts.dayCount === 1 ? '' : 's'}). Missing days leave gaps in the lines.
+                Conversions: ${escapeHtml(report.trendCharts.rangeLabel)} (${report.trendCharts.dayCount} day${report.trendCharts.dayCount === 1 ? '' : 's'}). Chat metrics: ${escapeHtml(report.trendCharts.chatTrendRangeLabel)} (${report.trendCharts.chatTrendDayCount} day${report.trendCharts.chatTrendDayCount === 1 ? '' : 's'}). Missing days leave gaps in the lines.
               </div>
               <div style="margin:0 0 20px 0;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;">
                 ${trendChartImg(
@@ -403,7 +403,7 @@ export function renderDailyEmailHtml(
               <div style="margin:0 0 24px 0;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;">
                 ${trendChartImg(
                   report.trendCharts.chatRatesPng,
-                  `Frustration and confusion by initiator and channel (${report.trendCharts.rangeLabel})`,
+                  `Frustration and confusion by initiator and channel (${report.trendCharts.chatTrendRangeLabel})`,
                   chartImageMode,
                   EMAIL_TREND_CHAT_RATES_CID
                 )}

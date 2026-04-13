@@ -35,45 +35,29 @@ export interface EmailChatBreakdownTrends {
   confusionAgentInitByBot: (number | null)[];
 }
 
+const emptyChatBreakdown = (): EmailChatBreakdownTrends => ({
+  frustrationClientByAgent: [],
+  frustrationClientByBot: [],
+  frustrationAgentInitByAgent: [],
+  frustrationAgentInitByBot: [],
+  confusionClientByAgent: [],
+  confusionClientByBot: [],
+  confusionAgentInitByAgent: [],
+  confusionAgentInitByBot: [],
+});
+
 /**
- * Load daily conversion rate (% per product) and By Conversation frustration/confusion breakdown per date.
- * Missing snapshot for a day → null per product that day; missing chat → null for all chat series.
+ * Load conversion trend (per product) and chat breakdown trend on separate date ranges.
+ * First chart: `conversionDates` (e.g. from Apr 6). Second chart: `chatDates` (e.g. from Apr 13).
  */
-export async function loadEmailTrendSeries(dates: string[]): Promise<{
+export async function loadEmailTrendSeries(
+  conversionDates: string[],
+  chatDates: string[]
+): Promise<{
   labels: string[];
-  /** Percent 0–100 per product per day (null only if no row for that product/day; 0 prospects → 0%). */
   conversionRatePctByLabel: Map<string, (number | null)[]>;
   chatBreakdown: EmailChatBreakdownTrends;
 }> {
-  const emptyChatBreakdown = (): EmailChatBreakdownTrends => ({
-    frustrationClientByAgent: [],
-    frustrationClientByBot: [],
-    frustrationAgentInitByAgent: [],
-    frustrationAgentInitByBot: [],
-    confusionClientByAgent: [],
-    confusionClientByBot: [],
-    confusionAgentInitByAgent: [],
-    confusionAgentInitByBot: [],
-  });
-
-  if (dates.length === 0) {
-    return {
-      labels: [],
-      conversionRatePctByLabel: new Map(),
-      chatBreakdown: emptyChatBreakdown(),
-    };
-  }
-
-  const snapshots = await Promise.all(
-    dates.map(async (d) => {
-      const [rows, chat] = await Promise.all([
-        tryLoadServiceOverviewForDate(d),
-        getDailyChatAnalysisData(d),
-      ]);
-      return { d, rows, chat };
-    })
-  );
-
   const labels: string[] = [...SERVICE_OVERVIEW_PRODUCT_LABELS];
 
   const conversionRatePctByLabel = new Map<string, (number | null)[]>();
@@ -81,8 +65,26 @@ export async function loadEmailTrendSeries(dates: string[]): Promise<{
     conversionRatePctByLabel.set(lb, []);
   }
 
-  const chatBreakdown = emptyChatBreakdown();
+  if (conversionDates.length > 0) {
+    const conversionSnapshots = await Promise.all(
+      conversionDates.map((d) => tryLoadServiceOverviewForDate(d))
+    );
+    for (const rows of conversionSnapshots) {
+      if (!rows) {
+        for (const lb of labels) {
+          conversionRatePctByLabel.get(lb)!.push(null);
+        }
+      } else {
+        const byL = new Map(rows.map((r) => [r.label, r] as const));
+        for (const lb of labels) {
+          const r = byL.get(lb);
+          conversionRatePctByLabel.get(lb)!.push(r !== undefined ? rowConversionRatePercent(r) : null);
+        }
+      }
+    }
+  }
 
+  const chatBreakdown = emptyChatBreakdown();
   const pushChatNulls = () => {
     chatBreakdown.frustrationClientByAgent.push(null);
     chatBreakdown.frustrationClientByBot.push(null);
@@ -94,21 +96,12 @@ export async function loadEmailTrendSeries(dates: string[]): Promise<{
     chatBreakdown.confusionAgentInitByBot.push(null);
   };
 
-  for (let i = 0; i < snapshots.length; i++) {
-    const { rows, chat } = snapshots[i];
+  if (chatDates.length === 0) {
+    return { labels, conversionRatePctByLabel, chatBreakdown };
+  }
 
-    if (!rows) {
-      for (const lb of labels) {
-        conversionRatePctByLabel.get(lb)!.push(null);
-      }
-    } else {
-      const byL = new Map(rows.map((r) => [r.label, r] as const));
-      for (const lb of labels) {
-        const r = byL.get(lb);
-        conversionRatePctByLabel.get(lb)!.push(r !== undefined ? rowConversionRatePercent(r) : null);
-      }
-    }
-
+  const chatSnapshots = await Promise.all(chatDates.map((d) => getDailyChatAnalysisData(d)));
+  for (const chat of chatSnapshots) {
     const v = chat ? byConversationViewFrom(chat) : null;
     if (!v) {
       pushChatNulls();

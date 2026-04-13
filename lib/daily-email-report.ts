@@ -11,6 +11,7 @@ import {
 import {
   applyPeriodAggregatesToRows,
   computeExtendedTotalsRow,
+  emailChatTrendDateRange,
   emailTrendDateRange,
   lastMonthDateRange,
   loadServiceOverviewSnapshots,
@@ -77,10 +78,12 @@ export interface DailyEmailReportData {
   };
   /** By Conversation tab metrics — section 3 tables */
   byConversationEmail: ByConversationEmailPayload;
-  /** Daily trends from Apr 6 through report date (same calendar year as report) */
+  /** Daily trends: conversion from Apr 6; chat breakdown from Apr 13 (same calendar year as report). */
   trendCharts: {
     rangeLabel: string;
     dayCount: number;
+    chatTrendRangeLabel: string;
+    chatTrendDayCount: number;
     /** PNG bytes: attach with `cid:` for real email; use data URL in dry-run HTML preview */
     conversionPng: Buffer | null;
     chatRatesPng: Buffer | null;
@@ -94,6 +97,8 @@ export function serializeDailyEmailReportForJson(report: DailyEmailReportData): 
     trendCharts: {
       rangeLabel: report.trendCharts.rangeLabel,
       dayCount: report.trendCharts.dayCount,
+      chatTrendRangeLabel: report.trendCharts.chatTrendRangeLabel,
+      chatTrendDayCount: report.trendCharts.chatTrendDayCount,
       conversionPngBytes: report.trendCharts.conversionPng?.length ?? 0,
       chatRatesPngBytes: report.trendCharts.chatRatesPng?.length ?? 0,
     },
@@ -105,6 +110,13 @@ function formatTrendRangeLabel(reportDate: string): string {
   const end = new Date(`${reportDate}T12:00:00Z`);
   const endStr = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(end);
   return `Apr 6 – ${endStr}, ${y}`;
+}
+
+function formatChatTrendRangeLabel(reportDate: string): string {
+  const y = reportDate.slice(0, 4);
+  const end = new Date(`${reportDate}T12:00:00Z`);
+  const endStr = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(end);
+  return `Apr 13 – ${endStr}, ${y}`;
 }
 
 function parseBooleanParam(value: string | null): boolean {
@@ -194,12 +206,13 @@ async function getAverageResponseTime(date: string): Promise<string | null> {
 }
 
 export async function getDailyEmailReportData(date: string): Promise<DailyEmailReportData> {
-  const trendDates = emailTrendDateRange(date);
+  const conversionDates = emailTrendDateRange(date);
+  const chatTrendDates = emailChatTrendDateRange(date);
   const [block, chatData, averageResponseTime, trendSeries] = await Promise.all([
     getProspectsAndSalesBlock(date),
     getDailyChatAnalysisData(date),
     getAverageResponseTime(date),
-    loadEmailTrendSeries(trendDates),
+    loadEmailTrendSeries(conversionDates, chatTrendDates),
   ]);
 
   if (!chatData) {
@@ -211,12 +224,13 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
   const m = chatData.overallMetrics;
 
   const rangeLabel = formatTrendRangeLabel(date);
+  const chatTrendRangeLabel = formatChatTrendRangeLabel(date);
   const conversionSeries = trendSeries.labels.map((label) => ({
     label,
     values: trendSeries.conversionRatePctByLabel.get(label) ?? [],
   }));
   const conversionSvg = renderConversionTrendSvg(
-    trendDates,
+    conversionDates,
     conversionSeries,
     `Daily conversion rate by product (${rangeLabel})`
   );
@@ -232,9 +246,9 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
     { label: 'Cf. agent init. · bot/sys', values: b.confusionAgentInitByBot, color: '#aed6f1' },
   ];
   const chatRatesSvg = renderChatRatesTrendSvg(
-    trendDates,
+    chatTrendDates,
     chatBreakdownSeries,
-    `Frustration & confusion — by initiator & channel (${rangeLabel})`
+    `Frustration & confusion — by initiator & channel (${chatTrendRangeLabel})`
   );
 
   const convPng = trySvgToPngBuffer(conversionSvg);
@@ -264,7 +278,9 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
     byConversationEmail,
     trendCharts: {
       rangeLabel,
-      dayCount: trendDates.length,
+      dayCount: conversionDates.length,
+      chatTrendRangeLabel,
+      chatTrendDayCount: chatTrendDates.length,
       conversionPng,
       chatRatesPng,
     },

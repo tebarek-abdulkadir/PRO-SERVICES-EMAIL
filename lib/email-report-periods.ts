@@ -70,6 +70,14 @@ export function emailTrendDateRange(reportDate: string): string[] {
   return enumerateDatesInclusive(start, reportDate);
 }
 
+/** Chat frustration/confusion trend window: April 13 through report date (email second chart only). */
+export function emailChatTrendDateRange(reportDate: string): string[] {
+  const y = reportDate.slice(0, 4);
+  const start = `${y}-04-13`;
+  if (start > reportDate) return [];
+  return enumerateDatesInclusive(start, reportDate);
+}
+
 /**
  * Load service overview rows for one day. Returns null if prospects/sales data is missing
  * (no blob, incomplete payload, etc.) so the day is excluded from MTD/LM averages.
