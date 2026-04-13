@@ -206,8 +206,10 @@ export function renderChatRatesTrendSvg(
   title: string
 ): string {
   const W = 640;
-  const H = 560;
-  const padL = 58;
+  /** Extra height for 8 stacked value rows per column (same idea as conversion chart). */
+  const H = 600;
+  /** Match conversion chart: room for Y-axis % labels without overlapping first column values. */
+  const padL = 56;
   const padR = 14;
   const padB = X_AXIS_PAD + 8;
   const legendRows = Math.ceil(Math.max(1, series.length) / 2);
@@ -255,6 +257,32 @@ export function renderChatRatesTrendSvg(
     }
   }
 
+  /**
+   * Per-date stacked % labels in the upper plot band (same pattern as conversion chart).
+   * Band spans ~100%→18% on Y so 8 rows fit without crowding; first column nudged right of Y-axis.
+   */
+  const FIRST_DATE_STACK_NUDGE = 20;
+  const bandTopPx = yAt(100) + 4;
+  const bandBottomPx = yAt(18) - 4;
+  const spanPx = Math.max(bandBottomPx - bandTopPx, series.length * 6);
+  const slotH = spanPx / series.length;
+  const labelFontPx = series.length >= 8 ? 7 : 8;
+
+  const chatColumnLabels: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const colX = xAt(i) + (i === 0 ? FIRST_DATE_STACK_NUDGE : 0);
+    series.forEach((s, idx) => {
+      const v = s.values[i];
+      const yBaseline = bandTopPx + (idx + 0.5) * slotH + 2;
+      const hasVal = typeof v === 'number' && !Number.isNaN(v);
+      const labelText = hasVal ? fmtPct(v) : '\u2014';
+      const fill = hasVal ? s.color : MUTED;
+      chatColumnLabels.push(
+        `<text x="${colX}" y="${yBaseline}" text-anchor="middle" font-size="${labelFontPx}" font-weight="600" fill="${fill}" font-family="${FONT}">${esc(labelText)}</text>`
+      );
+    });
+  }
+
   const legendY = PLOT_TOP + plotH + 28;
   const legendItems = series.map((s, idx) => {
     const col = idx % 2;
@@ -276,6 +304,7 @@ export function renderChatRatesTrendSvg(
   ${gridLines.join('\n  ')}
   ${yLabels.join('\n  ')}
   ${paths.join('\n  ')}
+  ${chatColumnLabels.join('\n  ')}
   ${xLabels.join('\n  ')}
   ${legendItems.join('\n  ')}
 </svg>`;
