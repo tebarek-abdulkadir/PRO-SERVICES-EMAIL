@@ -266,7 +266,7 @@ function renderInitiatorComparisonTable(report: DailyEmailReportData): string {
           <th style="${thStyle}" colspan="2">Frustrated By Agent</th>
           <th style="${thStyle}" colspan="2">Confused By Bot</th>
           <th style="${thStyle}" colspan="2">Confused By Agent</th>
-          <th style="${thStyle}" colspan="2">Agent Score (avg)</th>
+          <th style="${thStyle}" colspan="2">Agent Score (out of 5)</th>
         </tr>
         <tr>
           <th style="${thStyle}">${colToday}</th>
