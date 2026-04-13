@@ -12,15 +12,148 @@ import {
   Headphones,
 } from 'lucide-react';
 import { dedupeChatConversationResults } from '@/lib/chat-email-metrics';
-import {
-  computeByChatsViewMetrics,
-  createEmptyByChatsViewMetrics,
-} from '@/lib/chat-by-chats-metrics';
-import type { ChatAnalysisData, ChatTrendData } from '@/lib/chat-types';
+import { createEmptyByConversationViewData } from '@/lib/chat-by-conversation-metrics';
+import type {
+  ChatAnalysisData,
+  ChatAnalysisResult,
+  ChatTrendData,
+  ConversationSectionMetrics,
+} from '@/lib/chat-types';
 import DatePickerCalendar from '@/components/DatePickerCalendar';
 import ChatTrendChart from '@/components/ChatTrendChart';
 
 type ViewMode = 'people' | 'conversation';
+
+function ConversationInitiatorBlock({
+  title,
+  subtitle,
+  m,
+  showChatbot,
+  pct,
+  formatAvg,
+}: {
+  title: string;
+  subtitle: string;
+  m: ConversationSectionMetrics;
+  showChatbot: boolean;
+  pct: (part: number, whole: number) => number;
+  formatAvg: (n: number | null) => string;
+}) {
+  const t = m.totalChats;
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+        <p className="text-sm text-slate-500 mt-1">{subtitle}</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl p-6 border-2 border-slate-200 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-auto">
+            <MessageSquare className="w-6 h-6 text-slate-600" />
+          </div>
+          <div className="mt-auto">
+            <div className="text-3xl font-bold text-slate-900 mb-1">{m.totalChats}</div>
+            <div className="text-sm font-medium text-slate-600">Total Chats</div>
+            <div className="text-xs text-slate-500 mt-2">Deduped by conversation id</div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl p-6 border-2 border-slate-200 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-auto">
+            <Frown className="w-6 h-6 text-red-600" />
+            <span className="text-xl font-bold text-red-600">{m.frustrationPct}%</span>
+          </div>
+          <div className="mt-auto">
+            <div className="text-3xl font-bold text-slate-900 mb-1">{m.frustrationCount}</div>
+            <div className="text-sm font-medium text-slate-600">Frustration</div>
+            <div className="text-xs text-slate-500 mt-2">of chats in this section</div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl p-6 border-2 border-slate-200 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-auto">
+            <Headphones className="w-6 h-6 text-amber-700" />
+            <span className="text-xl font-bold text-amber-700">{m.frustrationByAgentPct}%</span>
+          </div>
+          <div className="mt-auto">
+            <div className="text-3xl font-bold text-slate-900 mb-1">{m.frustrationByAgentCount}</div>
+            <div className="text-sm font-medium text-slate-600">Frustration caused by Agent</div>
+            <div className="text-xs text-slate-500 mt-2">frustrated + frustratedBy agent</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl p-6 border-2 border-slate-200 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-auto">
+            <Bot className="w-6 h-6 text-violet-600" />
+            <span className="text-xl font-bold text-violet-700">{m.frustrationByBotOrSystemPct}%</span>
+          </div>
+          <div className="mt-auto">
+            <div className="text-3xl font-bold text-slate-900 mb-1">{m.frustrationByBotOrSystemCount}</div>
+            <div className="text-sm font-medium text-slate-600">Frustration caused by Bot / System</div>
+            <div className="text-xs text-slate-500 mt-2">frustrated + frustratedBy bot or system</div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl p-6 border-2 border-slate-200 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-auto">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Avg</span>
+          </div>
+          <div className="mt-auto">
+            <div className="text-3xl font-bold text-slate-900 mb-1">{formatAvg(m.agentScoreAvg)}</div>
+            <div className="text-sm font-medium text-slate-600">Agent score</div>
+            <div className="text-xs text-slate-500 mt-2">Non-null scores only</div>
+          </div>
+        </div>
+
+        <div className="hidden md:block" aria-hidden />
+      </div>
+
+      {showChatbot && (
+        <div className="space-y-3 pt-2">
+          <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+            <Bot className="w-5 h-5 text-violet-600" />
+            Chatbot & routing (joinedSkills)
+          </h3>
+          <p className="text-sm text-slate-500">
+            Same bot/agent token rules as the By People tab (e.g. GPT_VBC_SALES / VBC_SALES_AGENTS).
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl p-6 border-2 border-violet-100 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <Bot className="w-6 h-6 text-violet-600" />
+                <span className="text-lg font-bold text-violet-700">{pct(m.chatbotCoverageCount, t)}%</span>
+              </div>
+              <div className="text-3xl font-bold text-slate-900">{m.chatbotCoverageCount}</div>
+              <div className="text-sm font-medium text-slate-600 mt-1">Chatbot coverage</div>
+              <div className="text-xs text-slate-500 mt-1">Bot skills in joinedSkills</div>
+            </div>
+            <div className="bg-white rounded-xl p-6 border-2 border-violet-100 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <Bot className="w-6 h-6 text-violet-600" />
+                <span className="text-lg font-bold text-violet-700">{pct(m.fullyBotCount, t)}%</span>
+              </div>
+              <div className="text-3xl font-bold text-slate-900">{m.fullyBotCount}</div>
+              <div className="text-sm font-medium text-slate-600 mt-1">Chats fully handled by bot</div>
+              <div className="text-xs text-slate-500 mt-1">Bot tokens, no agent tokens</div>
+            </div>
+            <div className="bg-white rounded-xl p-6 border-2 border-emerald-100 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <Headphones className="w-6 h-6 text-emerald-600" />
+                <span className="text-lg font-bold text-emerald-700">{pct(m.atLeastOneAgentMessageCount, t)}%</span>
+              </div>
+              <div className="text-3xl font-bold text-slate-900">{m.atLeastOneAgentMessageCount}</div>
+              <div className="text-sm font-medium text-slate-600 mt-1">Chats with ≥1 agent message</div>
+              <div className="text-xs text-slate-500 mt-1">Agent skill tokens in joinedSkills</div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ChatsDashboard() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -211,21 +344,17 @@ export default function ChatsDashboard() {
   const confusionPercentage = data.overallMetrics.confusionPercentage;
   
   const deduplicatedArray = dedupeChatConversationResults(data.conversationResults);
-  /** Prefer server `byChatsView`; if missing (old deploy/blob), recompute from stored joinedSkills on results. */
-  const bc =
-    data.byChatsView ??
-    (() => {
-      const rows = deduplicatedArray
-        .filter((r) => r.joinedSkills?.trim())
-        .map((r) => ({
-          conversationId: r.conversationId,
-          frustrated: r.frustrated,
-          confused: r.confused,
-          joinedSkills: r.joinedSkills,
-        }));
-      if (rows.length === 0) return createEmptyByChatsViewMetrics();
-      return computeByChatsViewMetrics(rows);
-    })();
+  const byConv = data.byConversationView ?? createEmptyByConversationViewData();
+
+  function pct(part: number, whole: number): number {
+    if (whole <= 0) return 0;
+    return Math.round((part / whole) * 100);
+  }
+
+  function formatAvg(n: number | null): string {
+    if (n == null || Number.isNaN(n)) return '—';
+    return n.toFixed(2);
+  }
 
   // Calculate additional metrics for display
   const bothFrustratedAndConfused = deduplicatedArray.filter(c => c.frustrated && c.confused).length;
@@ -362,263 +491,33 @@ export default function ChatsDashboard() {
       </div>
       )}
 
-      {/* Stats: By Conversation — joinedSkills pipeline (see lib/chat-joined-skills.ts) */}
+      {/* Stats: By Conversation — initiator split (same card grid style as By People) */}
       {viewMode === 'conversation' && (
-        <div className="space-y-8">
-          <p className="text-sm text-slate-500">
-            Bot/agent uses <code className="rounded bg-slate-100 px-1 text-xs">joinedSkills</code> (contains,
-            case-insensitive): bot if GPT_VBC_SALES or VBC_ROUTING_BOT; agent if VBC_SALES_AGENTS or
-            VBC_RESOLVERS_AGENTS. Totals dedupe by conversation id; bot and agent segments can overlap.
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white rounded-xl p-6 border-2 border-slate-200 shadow-sm flex flex-col">
-              <div className="flex items-center justify-between mb-auto">
-                <MessageSquare className="w-6 h-6 text-slate-600" />
-              </div>
-              <div className="mt-auto">
-                <div className="text-3xl font-bold text-slate-900 mb-1">{bc.totalChats}</div>
-                <div className="text-sm font-medium text-slate-600">Total Chats</div>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl p-6 border-2 border-slate-200 shadow-sm flex flex-col">
-              <div className="flex items-center justify-between mb-auto">
-                <Frown className="w-6 h-6 text-red-600" />
-                <span className="text-xl font-bold text-red-600">{bc.frustratedPctOfAllChats}%</span>
-              </div>
-              <div className="mt-auto">
-                <div className="text-3xl font-bold text-slate-900 mb-1">{bc.totalFrustrated}</div>
-                <div className="text-sm font-medium text-slate-600">Frustrated Chats</div>
-                <div className="text-xs text-slate-500 mt-2">% of all chats</div>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl p-6 border-2 border-slate-200 shadow-sm flex flex-col">
-              <div className="flex items-center justify-between mb-auto">
-                <HelpCircle className="w-6 h-6 text-blue-600" />
-                <span className="text-xl font-bold text-blue-600">{bc.confusedPctOfAllChats}%</span>
-              </div>
-              <div className="mt-auto">
-                <div className="text-3xl font-bold text-slate-900 mb-1">{bc.totalConfused}</div>
-                <div className="text-sm font-medium text-slate-600">Confused Chats</div>
-                <div className="text-xs text-slate-500 mt-2">% of all chats</div>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-lg font-semibold text-slate-800 mb-1 flex items-center gap-2">
-              <Bot className="w-5 h-5 text-violet-600" />
-              Bot-handled chats
-            </h2>
-            <p className="text-sm text-slate-500 mb-4">
-              {bc.totalBotPctOfAllChats}% of all chats match the bot segment (can overlap with agent).
+        <div className="space-y-10">
+          {byConv.excludedNoInitiator > 0 && (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
+              {byConv.excludedNoInitiator} conversation(s) excluded (missing or unknown{' '}
+              <code className="text-xs bg-amber-100 px-1 rounded">initiator</code>).
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-xl p-6 border-2 border-violet-100 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <Bot className="w-6 h-6 text-violet-600" />
-                  <span className="text-lg font-bold text-violet-700">{bc.totalBotPctOfAllChats}%</span>
-                </div>
-                <div className="text-3xl font-bold text-slate-900">{bc.totalBot}</div>
-                <div className="text-sm font-medium text-slate-600 mt-1">Total Bot Chats</div>
-                <div className="text-xs text-slate-500 mt-1">% of all chats</div>
-              </div>
-              <div className="bg-white rounded-xl p-6 border-2 border-red-100 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <Frown className="w-6 h-6 text-red-600" />
-                  <span className="text-lg font-bold text-red-600">{bc.frustrationPctWithinTotalBot}%</span>
-                </div>
-                <div className="text-3xl font-bold text-slate-900">{bc.frustratedInTotalBot}</div>
-                <div className="text-sm font-medium text-slate-600 mt-1">Frustrated (bot segment)</div>
-                <div className="text-xs text-slate-500 mt-1">% within total bot chats</div>
-              </div>
-              <div className="bg-white rounded-xl p-6 border-2 border-blue-100 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <HelpCircle className="w-6 h-6 text-blue-600" />
-                  <span className="text-lg font-bold text-blue-600">{bc.confusionPctWithinTotalBot}%</span>
-                </div>
-                <div className="text-3xl font-bold text-slate-900">{bc.confusedInTotalBot}</div>
-                <div className="text-sm font-medium text-slate-600 mt-1">Confused (bot segment)</div>
-                <div className="text-xs text-slate-500 mt-1">% within total bot chats</div>
-              </div>
-            </div>
-
-            <h3 className="text-sm font-semibold text-slate-700 mt-6 mb-3">Fully handled by bot</h3>
-            <p className="text-xs text-slate-500 mb-3">
-              Bot only (not agent). Headline count as % of all chats; frustration/confusion within this slice.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-xl p-5 border border-violet-200 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-slate-600">Chats</span>
-                  <span className="text-base font-bold text-violet-700">{bc.fullyBotPctOfAllChats}%</span>
-                </div>
-                <div className="text-2xl font-bold text-slate-900">{bc.fullyBot}</div>
-                <div className="text-xs text-slate-500 mt-1">% of all chats</div>
-              </div>
-              <div className="bg-white rounded-xl p-5 border border-red-100 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <Frown className="w-5 h-5 text-red-600" />
-                  <span className="text-base font-bold text-red-600">{bc.frustrationPctWithinFullyBot}%</span>
-                </div>
-                <div className="text-2xl font-bold text-slate-900">{bc.frustratedInFullyBot}</div>
-                <div className="text-xs text-slate-500 mt-1">Frustrated · within fully bot</div>
-              </div>
-              <div className="bg-white rounded-xl p-5 border border-blue-100 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <HelpCircle className="w-5 h-5 text-blue-600" />
-                  <span className="text-base font-bold text-blue-600">{bc.confusionPctWithinFullyBot}%</span>
-                </div>
-                <div className="text-2xl font-bold text-slate-900">{bc.confusedInFullyBot}</div>
-                <div className="text-xs text-slate-500 mt-1">Confused · within fully bot</div>
-              </div>
-            </div>
-
-            <h3 className="text-sm font-semibold text-slate-700 mt-6 mb-3">Bot chats with at least one agent segment</h3>
-            <p className="text-xs text-slate-500 mb-3">Bot ∩ agent overlap. Frustration/confusion within this overlap slice.</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-xl p-5 border border-violet-200 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-slate-600">Chats</span>
-                  <span className="text-base font-bold text-violet-700">{bc.botWithAgentPctOfTotalBot}%</span>
-                </div>
-                <div className="text-2xl font-bold text-slate-900">{bc.botWithAgentMessage}</div>
-                <div className="text-xs text-slate-500 mt-1">% of total bot chats</div>
-              </div>
-              <div className="bg-white rounded-xl p-5 border border-red-100 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <Frown className="w-5 h-5 text-red-600" />
-                  <span className="text-base font-bold text-red-600">{bc.frustrationPctWithinBotWithAgent}%</span>
-                </div>
-                <div className="text-2xl font-bold text-slate-900">{bc.frustratedInBotWithAgent}</div>
-                <div className="text-xs text-slate-500 mt-1">Frustrated · within overlap</div>
-              </div>
-              <div className="bg-white rounded-xl p-5 border border-blue-100 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <HelpCircle className="w-5 h-5 text-blue-600" />
-                  <span className="text-base font-bold text-blue-600">{bc.confusionPctWithinBotWithAgent}%</span>
-                </div>
-                <div className="text-2xl font-bold text-slate-900">{bc.confusedInBotWithAgent}</div>
-                <div className="text-xs text-slate-500 mt-1">Confused · within overlap</div>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-lg font-semibold text-slate-800 mb-1 flex items-center gap-2">
-              <Headphones className="w-5 h-5 text-emerald-600" />
-              Agent-handled chats
-            </h2>
-            <p className="text-sm text-slate-500 mb-4">
-              {bc.totalAgentPctOfAllChats}% of all chats match the agent segment (can overlap with bot).
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-xl p-6 border-2 border-emerald-100 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <Headphones className="w-6 h-6 text-emerald-600" />
-                  <span className="text-lg font-bold text-emerald-700">{bc.totalAgentPctOfAllChats}%</span>
-                </div>
-                <div className="text-3xl font-bold text-slate-900">{bc.totalAgent}</div>
-                <div className="text-sm font-medium text-slate-600 mt-1">Total Agent Chats</div>
-                <div className="text-xs text-slate-500 mt-1">% of all chats</div>
-              </div>
-              <div className="bg-white rounded-xl p-6 border-2 border-red-100 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <Frown className="w-6 h-6 text-red-600" />
-                  <span className="text-lg font-bold text-red-600">{bc.frustrationPctWithinTotalAgent}%</span>
-                </div>
-                <div className="text-3xl font-bold text-slate-900">{bc.frustratedInTotalAgent}</div>
-                <div className="text-sm font-medium text-slate-600 mt-1">Frustrated (agent segment)</div>
-                <div className="text-xs text-slate-500 mt-1">% within total agent chats</div>
-              </div>
-              <div className="bg-white rounded-xl p-6 border-2 border-blue-100 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <HelpCircle className="w-6 h-6 text-blue-600" />
-                  <span className="text-lg font-bold text-blue-600">{bc.confusionPctWithinTotalAgent}%</span>
-                </div>
-                <div className="text-3xl font-bold text-slate-900">{bc.confusedInTotalAgent}</div>
-                <div className="text-sm font-medium text-slate-600 mt-1">Confused (agent segment)</div>
-                <div className="text-xs text-slate-500 mt-1">% within total agent chats</div>
-              </div>
-            </div>
-
-            <h3 className="text-sm font-semibold text-slate-700 mt-6 mb-3">Fully handled by agent</h3>
-            <p className="text-xs text-slate-500 mb-3">
-              Agent only (not bot). Headline count as % of all chats; frustration/confusion within this slice.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-xl p-5 border border-emerald-200 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-slate-600">Chats</span>
-                  <span className="text-base font-bold text-emerald-700">{bc.fullyAgentPctOfAllChats}%</span>
-                </div>
-                <div className="text-2xl font-bold text-slate-900">{bc.fullyAgent}</div>
-                <div className="text-xs text-slate-500 mt-1">% of all chats</div>
-              </div>
-              <div className="bg-white rounded-xl p-5 border border-red-100 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <Frown className="w-5 h-5 text-red-600" />
-                  <span className="text-base font-bold text-red-600">{bc.frustrationPctWithinFullyAgent}%</span>
-                </div>
-                <div className="text-2xl font-bold text-slate-900">{bc.frustratedInFullyAgent}</div>
-                <div className="text-xs text-slate-500 mt-1">Frustrated · within fully agent</div>
-              </div>
-              <div className="bg-white rounded-xl p-5 border border-blue-100 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <HelpCircle className="w-5 h-5 text-blue-600" />
-                  <span className="text-base font-bold text-blue-600">{bc.confusionPctWithinFullyAgent}%</span>
-                </div>
-                <div className="text-2xl font-bold text-slate-900">{bc.confusedInFullyAgent}</div>
-                <div className="text-xs text-slate-500 mt-1">Confused · within fully agent</div>
-              </div>
-            </div>
-
-            <h3 className="text-sm font-semibold text-slate-700 mt-6 mb-3">Agent chats with at least one bot segment</h3>
-            <p className="text-xs text-slate-500 mb-3">Same overlap as bot ∩ agent. Frustration/confusion within this slice.</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-xl p-5 border border-emerald-200 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-slate-600">Chats</span>
-                  <span className="text-base font-bold text-emerald-700">{bc.agentWithBotPctOfTotalAgent}%</span>
-                </div>
-                <div className="text-2xl font-bold text-slate-900">{bc.agentWithBotMessage}</div>
-                <div className="text-xs text-slate-500 mt-1">% of total agent chats</div>
-              </div>
-              <div className="bg-white rounded-xl p-5 border border-red-100 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <Frown className="w-5 h-5 text-red-600" />
-                  <span className="text-base font-bold text-red-600">{bc.frustrationPctWithinAgentWithBot}%</span>
-                </div>
-                <div className="text-2xl font-bold text-slate-900">{bc.frustratedInAgentWithBot}</div>
-                <div className="text-xs text-slate-500 mt-1">Frustrated · within overlap</div>
-              </div>
-              <div className="bg-white rounded-xl p-5 border border-blue-100 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <HelpCircle className="w-5 h-5 text-blue-600" />
-                  <span className="text-base font-bold text-blue-600">{bc.confusionPctWithinAgentWithBot}%</span>
-                </div>
-                <div className="text-2xl font-bold text-slate-900">{bc.confusedInAgentWithBot}</div>
-                <div className="text-xs text-slate-500 mt-1">Confused · within overlap</div>
-              </div>
-            </div>
-          </div>
-
-          {bc.neitherBotNorAgent > 0 && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              <span className="font-semibold">{bc.neitherBotNorAgent} chat(s)</span> did not match bot or agent tokens
-              in <code className="rounded bg-amber-100 px-1">joinedSkills</code> (
-              <code className="rounded bg-amber-100 px-1">lib/chat-joined-skills.ts</code>).
-            </div>
           )}
 
-          {!data.byChatsView &&
-            !deduplicatedArray.some((r) => r.joinedSkills?.trim()) && (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                By Chats metrics are not on file and <code className="rounded bg-white px-1">joinedSkills</code> is
-                missing from conversation rows. Deploy the latest API and re-ingest with{' '}
-                <code className="rounded bg-white px-1">joinedSkills</code>.
-              </div>
-            )}
+          <ConversationInitiatorBlock
+            title="Consumer Initiated"
+            subtitle="Initiator is Consumer or Bot (case-insensitive)."
+            m={byConv.consumerInitiated}
+            showChatbot
+            pct={pct}
+            formatAvg={formatAvg}
+          />
+
+          <ConversationInitiatorBlock
+            title="Agent Initiated"
+            subtitle="Initiator is Agent (case-insensitive)."
+            m={byConv.agentInitiated}
+            showChatbot={false}
+            pct={pct}
+            formatAvg={formatAvg}
+          />
         </div>
       )}
 

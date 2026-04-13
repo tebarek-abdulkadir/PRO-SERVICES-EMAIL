@@ -11,6 +11,37 @@ export interface ChatAnalysisResult {
   skill?: string; // Skill/team (e.g., "VBC_RESOLVERS_AGENTS")
   /** Comma-separated skills from CC; used for By Chats classification (contains match). */
   joinedSkills?: string;
+  /** Who started the chat: Consumer | Bot | Agent (case-insensitive in metrics). */
+  initiator?: string;
+  /** Attribution when frustrated (e.g. Agent, Bot, System). */
+  frustratedBy?: string;
+  confusedBy?: string;
+  /** Average or single score from ingest; null if absent. */
+  agentScore?: number | null;
+}
+
+/** Precomputed By Conversation tab: Consumer vs Agent initiated sections. */
+export interface ConversationSectionMetrics {
+  totalChats: number;
+  frustrationCount: number;
+  frustrationPct: number;
+  frustrationByAgentCount: number;
+  frustrationByAgentPct: number;
+  frustrationByBotOrSystemCount: number;
+  frustrationByBotOrSystemPct: number;
+  agentScoreAvg: number | null;
+  chatbotCoverageCount: number;
+  chatbotCoveragePct: number;
+  fullyBotCount: number;
+  fullyBotPct: number;
+  atLeastOneAgentMessageCount: number;
+  atLeastOneAgentMessagePct: number;
+}
+
+export interface ByConversationViewData {
+  consumerInitiated: ConversationSectionMetrics;
+  agentInitiated: ConversationSectionMetrics;
+  excludedNoInitiator: number;
 }
 
 /** Precomputed metrics for the "By Conversation" (chats) view — from joinedSkills, deduped by conversation id only. */
@@ -127,6 +158,8 @@ export interface ChatAnalysisData {
   conversationResults: ChatAnalysisResult[];
   /** Computed on ingest from joinedSkills; omit in older daily JSON. */
   byChatsView?: ByChatsViewMetrics;
+  /** By Conversation tab: initiator-split metrics; omit in older daily JSON. */
+  byConversationView?: ByConversationViewData;
 }
 
 // API Request/Response types
@@ -149,6 +182,10 @@ export interface ChatAnalysisRequest {
     clientName?: string;
     /** Comma-separated; bot/agent for By Chats uses contains on this field. */
     joinedSkills?: string;
+    initiator?: string;
+    frustratedBy?: string;
+    confusedBy?: string;
+    agentScore?: number | null;
   }[];
 }
 

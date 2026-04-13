@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server';
 import { saveDailyChatAnalysisData, aggregateDailyChatAnalysisResults, getLatestChatAnalysisData, getDailyChatAnalysisData } from '@/lib/chat-storage';
 import { computeByChatsViewMetrics } from '@/lib/chat-by-chats-metrics';
+import { computeByConversationViewFromResults } from '@/lib/chat-by-conversation-metrics';
 import {
   buildJoinedSkillsLookupMap,
   mergeJoinedSkillsFields,
   resolveJoinedSkillsForMergedIds,
 } from '@/lib/chat-joined-skills';
+import {
+  buildChatMetaLookupMap,
+  resolveChatMetaForMergedIds,
+  type RawChatMetaRow,
+} from '@/lib/chat-conversation-meta-ingest';
 import type { ChatAnalysisData, ChatAnalysisRequest, ChatAnalysisResponse, ChatAnalysisResult, ChatDataResponse } from '@/lib/chat-types';
 
 type RawIngestRow = {
@@ -13,26 +19,54 @@ type RawIngestRow = {
   frustrated: boolean;
   confused: boolean;
   joinedSkills?: string;
+  initiator?: string;
+  frustratedBy?: string;
+  confusedBy?: string;
+  agentScore?: number | null;
 };
 
+function parseAgentScore(v: unknown): number | null {
+  if (v == null || v === '') return null;
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 /**
- * After aggregation, re-apply joinedSkills + byChatsView from the normalized POST body only.
- * This cannot be dropped by entity/content merge inside chat-storage.
+ * After aggregation, re-apply joinedSkills, conversation meta, byChatsView, byConversationView from POST body.
  */
-function applyJoinedSkillsFromRawIngest(
+function applyChatAnalysisFromRawIngest(
   data: ChatAnalysisData,
   rawRows: RawIngestRow[]
 ): ChatAnalysisData {
-  const lookup = buildJoinedSkillsLookupMap(
+  const joinedLookup = buildJoinedSkillsLookupMap(
     rawRows.map((r) => ({ conversationId: String(r.conversationId), joinedSkills: r.joinedSkills }))
   );
 
+  const metaLookup = buildChatMetaLookupMap(
+    rawRows.map(
+      (r): RawChatMetaRow => ({
+        conversationId: String(r.conversationId),
+        frustrated: r.frustrated,
+        initiator: r.initiator,
+        frustratedBy: r.frustratedBy,
+        confusedBy: r.confusedBy,
+        agentScore: r.agentScore,
+      })
+    )
+  );
+
   const conversationResults: ChatAnalysisResult[] = data.conversationResults.map((r) => {
-    const fromRaw = resolveJoinedSkillsForMergedIds(String(r.conversationId), lookup);
-    const joinedSkills = mergeJoinedSkillsFields(r.joinedSkills, fromRaw).trim();
+    const idCsv = String(r.conversationId);
+    const fromRawJoined = resolveJoinedSkillsForMergedIds(idCsv, joinedLookup);
+    const joinedSkills = mergeJoinedSkillsFields(r.joinedSkills, fromRawJoined).trim();
+    const meta = resolveChatMetaForMergedIds(idCsv, metaLookup);
     return {
       ...r,
       ...(joinedSkills ? { joinedSkills } : {}),
+      ...(meta.initiator ? { initiator: meta.initiator } : {}),
+      ...(meta.frustratedBy ? { frustratedBy: meta.frustratedBy } : {}),
+      ...(meta.confusedBy ? { confusedBy: meta.confusedBy } : {}),
+      ...(meta.agentScore != null ? { agentScore: meta.agentScore } : {}),
     };
   });
 
@@ -45,10 +79,13 @@ function applyJoinedSkillsFromRawIngest(
     }))
   );
 
+  const byConversationView = computeByConversationViewFromResults(conversationResults);
+
   return {
     ...data,
     conversationResults,
     byChatsView,
+    byConversationView,
   };
 }
 
@@ -56,23 +93,30 @@ function applyJoinedSkillsFromRawIngest(
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-/** Older blobs may omit byChatsView; compute on read when joinedSkills exists on rows. */
+/** Older blobs may omit byChatsView / byConversationView; compute on read when possible. */
 function enrichChatDataForGet(data: ChatAnalysisData): ChatAnalysisData {
-  if (data.byChatsView != null) return data;
-  const rows =
-    data.conversationResults
-      ?.filter((r) => r.joinedSkills?.trim())
-      .map((r) => ({
-        conversationId: r.conversationId,
-        frustrated: r.frustrated,
-        confused: r.confused,
-        joinedSkills: r.joinedSkills!,
-      })) ?? [];
-  if (rows.length === 0) return data;
-  return {
-    ...data,
-    byChatsView: computeByChatsViewMetrics(rows),
-  };
+  let next = data;
+  if (data.byChatsView == null) {
+    const rows =
+      data.conversationResults
+        ?.filter((r) => r.joinedSkills?.trim())
+        .map((r) => ({
+          conversationId: r.conversationId,
+          frustrated: r.frustrated,
+          confused: r.confused,
+          joinedSkills: r.joinedSkills!,
+        })) ?? [];
+    if (rows.length > 0) {
+      next = { ...next, byChatsView: computeByChatsViewMetrics(rows) };
+    }
+  }
+  if (next.byConversationView == null && next.conversationResults?.length) {
+    next = {
+      ...next,
+      byConversationView: computeByConversationViewFromResults(next.conversationResults),
+    };
+  }
+  return next;
 }
 
 /**
@@ -195,6 +239,13 @@ export async function POST(request: Request): Promise<NextResponse<ChatAnalysisR
             ? String(joinedSkillsRaw)
             : undefined;
 
+      const rec = conv as Record<string, unknown>;
+      const str = (k: string) => {
+        const v = rec[k] ?? rec[k.toLowerCase()];
+        if (v == null || v === '') return undefined;
+        return String(v).trim();
+      };
+
       return {
         conversationId: String(conv.conversationId),
         chatStartDateTime: conv.chatStartDateTime || new Date().toISOString(),
@@ -211,18 +262,23 @@ export async function POST(request: Request): Promise<NextResponse<ChatAnalysisR
         maidName: conv.maidName,
         clientName: conv.clientName,
         contractType: conv.contractType,
+        initiator: str('initiator') ?? str('Initiator'),
+        frustratedBy: str('frustratedBy') ?? str('frustrated_by') ?? str('FrustratedBy'),
+        confusedBy: str('confusedBy') ?? str('confused_by') ?? str('ConfusedBy'),
+        agentScore: parseAgentScore(rec.agentScore ?? rec.AgentScore ?? rec.agent_score),
       };
     });
 
     // Aggregate the individual conversation scores into daily dashboard data
     const aggregatedData = await aggregateDailyChatAnalysisResults(conversations, analysisDate);
 
-    const toSave = applyJoinedSkillsFromRawIngest(aggregatedData, conversations);
+    const toSave = applyChatAnalysisFromRawIngest(aggregatedData, conversations);
 
     console.log('[Chat Analysis API] Pre-save snapshot:', {
       resultRows: toSave.conversationResults.length,
       firstJoinedSkillsLen: toSave.conversationResults[0]?.joinedSkills?.length ?? 0,
       byChatsTotalChats: toSave.byChatsView?.totalChats ?? 0,
+      byConvConsumer: toSave.byConversationView?.consumerInitiated.totalChats ?? 0,
     });
 
     // Save to blob storage
