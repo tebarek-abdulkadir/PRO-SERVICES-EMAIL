@@ -82,6 +82,13 @@ function yPercentScale(v: number): number {
   return Math.min(Math.max(v, 0), Y_PERCENT_MAX);
 }
 
+/** Chat rates chart (email PNG #2): fixed 0–50% Y-axis so low % values show variation more clearly. */
+const CHAT_RATES_Y_PERCENT_MAX = 50;
+
+function yChatRatesScale(v: number): number {
+  return Math.min(Math.max(v, 0), CHAT_RATES_Y_PERCENT_MAX);
+}
+
 export function renderConversionTrendSvg(
   dates: string[],
   series: ConversionSeriesInput[],
@@ -225,12 +232,13 @@ export function renderChatRatesTrendSvg(
   }
 
   const xAt = (i: number) => padL + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW);
-  const yAt = (v: number) => PLOT_TOP + plotH - (yPercentScale(v) / Y_PERCENT_MAX) * plotH;
+  const yAt = (v: number) =>
+    PLOT_TOP + plotH - (yChatRatesScale(v) / CHAT_RATES_Y_PERCENT_MAX) * plotH;
 
   const gridLines: string[] = [];
   const yLabels: string[] = [];
-  for (let p = 0; p <= Y_PERCENT_MAX; p += 5) {
-    const y = PLOT_TOP + plotH - (p / Y_PERCENT_MAX) * plotH;
+  for (let p = 0; p <= CHAT_RATES_Y_PERCENT_MAX; p += 5) {
+    const y = PLOT_TOP + plotH - (p / CHAT_RATES_Y_PERCENT_MAX) * plotH;
     gridLines.push(
       `<line x1="${padL}" y1="${y}" x2="${padL + plotW}" y2="${y}" stroke="#dddddd" stroke-width="1"/>`
     );
@@ -259,11 +267,11 @@ export function renderChatRatesTrendSvg(
 
   /**
    * Per-date stacked % labels in the upper plot band (same pattern as conversion chart).
-   * Band spans ~100%→18% on Y so 8 rows fit without crowding; first column nudged right of Y-axis.
+   * With 0–50% Y scale, band spans top (~50%) down to ~9% so labels stay in upper area.
    */
   const FIRST_DATE_STACK_NUDGE = 20;
-  const bandTopPx = yAt(100) + 4;
-  const bandBottomPx = yAt(18) - 4;
+  const bandTopPx = yAt(CHAT_RATES_Y_PERCENT_MAX) + 4;
+  const bandBottomPx = yAt(9) - 4;
   const spanPx = Math.max(bandBottomPx - bandTopPx, series.length * 6);
   const slotH = spanPx / series.length;
   const labelFontPx = series.length >= 8 ? 7 : 8;
@@ -298,7 +306,7 @@ export function renderChatRatesTrendSvg(
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}">
   <rect width="100%" height="100%" fill="#fafafa"/>
   <text x="${W / 2}" y="${TITLE_Y}" text-anchor="middle" font-size="14" font-weight="700" fill="${TEXT_FILL}" font-family="${FONT}">${esc(title)}</text>
-  <text x="${W / 2}" y="${SUBTITLE_Y}" text-anchor="middle" font-size="9" fill="${MUTED}" font-family="${FONT}">${esc('By Conversation: % of chats in section; client-initiated vs agent-initiated; attribution agent vs bot/system')}</text>
+  <text x="${W / 2}" y="${SUBTITLE_Y}" text-anchor="middle" font-size="9" fill="${MUTED}" font-family="${FONT}">${esc(`By Conversation: % of chats in section; client vs agent initiator; agent vs bot/system — Y-axis 0–${CHAT_RATES_Y_PERCENT_MAX}%`)}</text>
   <line x1="${padL}" y1="${PLOT_TOP + plotH}" x2="${padL + plotW}" y2="${PLOT_TOP + plotH}" stroke="#888888" stroke-width="1"/>
   <line x1="${padL}" y1="${PLOT_TOP}" x2="${padL}" y2="${PLOT_TOP + plotH}" stroke="#888888" stroke-width="1"/>
   ${gridLines.join('\n  ')}

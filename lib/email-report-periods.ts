@@ -70,10 +70,15 @@ export function emailTrendDateRange(reportDate: string): string[] {
   return enumerateDatesInclusive(start, reportDate);
 }
 
-/** Chat frustration/confusion trend window: April 13 through report date (email second chart only). */
-export function emailChatTrendDateRange(reportDate: string): string[] {
+/** First day of chat breakdown trend window: April 13 of the report year (email PNG #2). */
+export function emailChatTrendStartDate(reportDate: string): string {
   const y = reportDate.slice(0, 4);
-  const start = `${y}-04-13`;
+  return `${y}-04-13`;
+}
+
+/** Inclusive dates from April 13 through report date; empty if report is before April 13. */
+export function emailChatTrendDateRange(reportDate: string): string[] {
+  const start = emailChatTrendStartDate(reportDate);
   if (start > reportDate) return [];
   return enumerateDatesInclusive(start, reportDate);
 }

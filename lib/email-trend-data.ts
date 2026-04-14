@@ -1,8 +1,8 @@
-import { computeByConversationViewFromResults } from '@/lib/chat-by-conversation-metrics';
 import { getDailyChatAnalysisData } from '@/lib/chat-storage';
-import type { ChatAnalysisData } from '@/lib/chat-types';
+import { computeByConversationViewFromResults } from '@/lib/chat-by-conversation-metrics';
 import { SERVICE_OVERVIEW_PRODUCT_LABELS, type ServiceOverviewRow } from '@/lib/email-report-layout';
 import { tryLoadServiceOverviewForDate } from '@/lib/email-report-periods';
+import type { ChatAnalysisData } from '@/lib/chat-types';
 
 /** sales / prospects × 100; when prospects are 0, conversion is defined as 0% (no division by zero). */
 function rowConversionRatePercent(r: ServiceOverviewRow): number {
@@ -14,17 +14,14 @@ function rowConversionRatePercent(r: ServiceOverviewRow): number {
   return (100 * sales) / prospects;
 }
 
-function byConversationViewFrom(chat: ChatAnalysisData | null) {
-  if (!chat) return null;
-  if (chat.byConversationView) return chat.byConversationView;
-  if (chat.conversationResults?.length) {
-    return computeByConversationViewFromResults(chat.conversationResults);
-  }
+function viewFromData(data: ChatAnalysisData | null) {
+  if (!data) return null;
+  if (data.byConversationView) return data.byConversationView;
+  if (data.conversationResults?.length) return computeByConversationViewFromResults(data.conversationResults);
   return null;
 }
 
-/** Per-day % of chats in section (By Conversation); null when section has no chats that day. */
-export interface EmailChatBreakdownTrends {
+export type EmailChatBreakdown = {
   frustrationClientByAgent: (number | null)[];
   frustrationClientByBot: (number | null)[];
   frustrationAgentInitByAgent: (number | null)[];
@@ -33,109 +30,80 @@ export interface EmailChatBreakdownTrends {
   confusionClientByBot: (number | null)[];
   confusionAgentInitByAgent: (number | null)[];
   confusionAgentInitByBot: (number | null)[];
+};
+
+function emptyChatBreakdownArrays(): EmailChatBreakdown {
+  return {
+    frustrationClientByAgent: [],
+    frustrationClientByBot: [],
+    frustrationAgentInitByAgent: [],
+    frustrationAgentInitByBot: [],
+    confusionClientByAgent: [],
+    confusionClientByBot: [],
+    confusionAgentInitByAgent: [],
+    confusionAgentInitByBot: [],
+  };
 }
 
-const emptyChatBreakdown = (): EmailChatBreakdownTrends => ({
-  frustrationClientByAgent: [],
-  frustrationClientByBot: [],
-  frustrationAgentInitByAgent: [],
-  frustrationAgentInitByBot: [],
-  confusionClientByAgent: [],
-  confusionClientByBot: [],
-  confusionAgentInitByAgent: [],
-  confusionAgentInitByBot: [],
-});
-
 /**
- * Load conversion trend (per product) and chat breakdown trend on separate date ranges.
- * First chart: `conversionDates` (e.g. from Apr 6). Second chart: `chatDates` (e.g. from Apr 13).
+ * Load daily conversion rate (% per product) for `conversionDates`, and By Conversation breakdown
+ * series for `chatTrendDates` (often Apr 13–report date). Missing prospect/sales row → null; missing chat blob → nulls.
  */
 export async function loadEmailTrendSeries(
   conversionDates: string[],
-  chatDates: string[]
+  chatTrendDates: string[]
 ): Promise<{
   labels: string[];
   conversionRatePctByLabel: Map<string, (number | null)[]>;
-  chatBreakdown: EmailChatBreakdownTrends;
+  chatBreakdown: EmailChatBreakdown;
 }> {
   const labels: string[] = [...SERVICE_OVERVIEW_PRODUCT_LABELS];
-
   const conversionRatePctByLabel = new Map<string, (number | null)[]>();
   for (const lb of labels) {
     conversionRatePctByLabel.set(lb, []);
   }
 
-  if (conversionDates.length > 0) {
-    const conversionSnapshots = await Promise.all(
-      conversionDates.map((d) => tryLoadServiceOverviewForDate(d))
-    );
-    for (const rows of conversionSnapshots) {
-      if (!rows) {
-        for (const lb of labels) {
-          conversionRatePctByLabel.get(lb)!.push(null);
-        }
-      } else {
-        const byL = new Map(rows.map((r) => [r.label, r] as const));
-        for (const lb of labels) {
-          const r = byL.get(lb);
-          conversionRatePctByLabel.get(lb)!.push(r !== undefined ? rowConversionRatePercent(r) : null);
-        }
+  for (const d of conversionDates) {
+    const rows = await tryLoadServiceOverviewForDate(d);
+    if (!rows) {
+      for (const lb of labels) {
+        conversionRatePctByLabel.get(lb)!.push(null);
+      }
+    } else {
+      const byL = new Map(rows.map((r) => [r.label, r] as const));
+      for (const lb of labels) {
+        const r = byL.get(lb);
+        conversionRatePctByLabel.get(lb)!.push(r !== undefined ? rowConversionRatePercent(r) : null);
       }
     }
   }
 
-  const chatBreakdown = emptyChatBreakdown();
-  const pushChatNulls = () => {
-    chatBreakdown.frustrationClientByAgent.push(null);
-    chatBreakdown.frustrationClientByBot.push(null);
-    chatBreakdown.frustrationAgentInitByAgent.push(null);
-    chatBreakdown.frustrationAgentInitByBot.push(null);
-    chatBreakdown.confusionClientByAgent.push(null);
-    chatBreakdown.confusionClientByBot.push(null);
-    chatBreakdown.confusionAgentInitByAgent.push(null);
-    chatBreakdown.confusionAgentInitByBot.push(null);
-  };
+  const chatBreakdown = emptyChatBreakdownArrays();
 
-  if (chatDates.length === 0) {
-    return { labels, conversionRatePctByLabel, chatBreakdown };
-  }
-
-  const chatSnapshots = await Promise.all(chatDates.map((d) => getDailyChatAnalysisData(d)));
-  for (const chat of chatSnapshots) {
-    const v = chat ? byConversationViewFrom(chat) : null;
+  for (const d of chatTrendDates) {
+    const chat = await getDailyChatAnalysisData(d);
+    const v = viewFromData(chat);
     if (!v) {
-      pushChatNulls();
+      chatBreakdown.frustrationClientByAgent.push(null);
+      chatBreakdown.frustrationClientByBot.push(null);
+      chatBreakdown.frustrationAgentInitByAgent.push(null);
+      chatBreakdown.frustrationAgentInitByBot.push(null);
+      chatBreakdown.confusionClientByAgent.push(null);
+      chatBreakdown.confusionClientByBot.push(null);
+      chatBreakdown.confusionAgentInitByAgent.push(null);
+      chatBreakdown.confusionAgentInitByBot.push(null);
       continue;
     }
-
     const ci = v.consumerInitiated;
     const ai = v.agentInitiated;
-
-    chatBreakdown.frustrationClientByAgent.push(
-      ci.totalChats > 0 ? ci.frustrationByAgentPct : null
-    );
-    chatBreakdown.frustrationClientByBot.push(
-      ci.totalChats > 0 ? ci.frustrationByBotOrSystemPct : null
-    );
-    chatBreakdown.frustrationAgentInitByAgent.push(
-      ai.totalChats > 0 ? ai.frustrationByAgentPct : null
-    );
-    chatBreakdown.frustrationAgentInitByBot.push(
-      ai.totalChats > 0 ? ai.frustrationByBotOrSystemPct : null
-    );
-
-    chatBreakdown.confusionClientByAgent.push(
-      ci.totalChats > 0 ? ci.confusionByAgentPct : null
-    );
-    chatBreakdown.confusionClientByBot.push(
-      ci.totalChats > 0 ? ci.confusionByBotOrSystemPct : null
-    );
-    chatBreakdown.confusionAgentInitByAgent.push(
-      ai.totalChats > 0 ? ai.confusionByAgentPct : null
-    );
-    chatBreakdown.confusionAgentInitByBot.push(
-      ai.totalChats > 0 ? ai.confusionByBotOrSystemPct : null
-    );
+    chatBreakdown.frustrationClientByAgent.push(ci.frustrationByAgentPct);
+    chatBreakdown.frustrationClientByBot.push(ci.frustrationByBotOrSystemPct);
+    chatBreakdown.frustrationAgentInitByAgent.push(ai.frustrationByAgentPct);
+    chatBreakdown.frustrationAgentInitByBot.push(ai.frustrationByBotOrSystemPct);
+    chatBreakdown.confusionClientByAgent.push(ci.confusionByAgentPct);
+    chatBreakdown.confusionClientByBot.push(ci.confusionByBotOrSystemPct);
+    chatBreakdown.confusionAgentInitByAgent.push(ai.confusionByAgentPct);
+    chatBreakdown.confusionAgentInitByBot.push(ai.confusionByBotOrSystemPct);
   }
 
   return { labels, conversionRatePctByLabel, chatBreakdown };

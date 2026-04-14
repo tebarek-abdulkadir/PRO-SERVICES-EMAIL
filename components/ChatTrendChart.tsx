@@ -63,12 +63,8 @@ export default function ChatTrendChart({ data, isLoading }: ChatTrendChartProps)
   const frustrationTrend = calculateTrend(data.map(d => d.frustrationPercentage));
   const confusionTrend = calculateTrend(data.map(d => d.confusionPercentage));
 
-  // Dynamic Y-axis: scale to the max value with padding (round up to nearest 5)
-  const overallMax = Math.max(
-    Math.max(...data.map(d => d.frustrationPercentage)),
-    Math.max(...data.map(d => d.confusionPercentage))
-  );
-  const yAxisMax = Math.min(100, Math.ceil(overallMax / 5) * 5 + 5);
+  /** Fixed 0–50% scale so low single-digit % changes are easier to read (matches email chat trend chart). */
+  const yAxisMax = 50;
 
   const getTrendIcon = (trend: string) => {
     switch (trend) {
@@ -114,7 +110,7 @@ export default function ChatTrendChart({ data, isLoading }: ChatTrendChartProps)
           </div>
         </div>
         <p className="text-sm text-slate-600">
-          Changes in frustration and confusion levels over the last {data.length} days
+          Changes in frustration and confusion levels over the last {data.length} days (vertical axis 0–50%).
         </p>
       </div>
 
