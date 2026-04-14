@@ -4,6 +4,7 @@ import type {
   ConversationSectionMetrics,
 } from './chat-types';
 import { dedupeChatConversationResults } from './chat-email-metrics';
+import { parseAgentResponseTimeToSeconds } from './chat-agent-response-time';
 import {
   joinedSkillsIndicatesAgent,
   joinedSkillsIndicatesBot,
@@ -50,6 +51,7 @@ function emptySection(): ConversationSectionMetrics {
     fullyBotPct: 0,
     atLeastOneAgentMessageCount: 0,
     atLeastOneAgentMessagePct: 0,
+    averageAgentResponseTimeSeconds: null,
   };
 }
 
@@ -72,6 +74,7 @@ function computeSection(
   let cov = 0;
   let fully = 0;
   let agentMsg = 0;
+  const responseSeconds: number[] = [];
 
   for (const r of rows) {
     if (r.frustrated) frustrationCount++;
@@ -93,6 +96,9 @@ function computeSection(
     if (r.agentScore != null && typeof r.agentScore === 'number' && Number.isFinite(r.agentScore)) {
       scores.push(r.agentScore);
     }
+
+    const rt = parseAgentResponseTimeToSeconds(r.agentResponseTime ?? undefined);
+    if (rt != null) responseSeconds.push(rt);
 
     if (opts.includeChatbotBlock) {
       const js = r.joinedSkills;
@@ -120,6 +126,11 @@ function computeSection(
 
   if (scores.length > 0) {
     out.agentScoreAvg = scores.reduce((a, b) => a + b, 0) / scores.length;
+  }
+
+  if (responseSeconds.length > 0) {
+    out.averageAgentResponseTimeSeconds =
+      responseSeconds.reduce((a, b) => a + b, 0) / responseSeconds.length;
   }
 
   if (opts.includeChatbotBlock) {

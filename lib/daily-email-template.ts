@@ -1,3 +1,4 @@
+import { formatSecondsAsAgentResponseTime } from '@/lib/chat-agent-response-time';
 import type { DailyEmailReportData } from '@/lib/daily-email-report';
 import { EMAIL_TREND_CHAT_RATES_CID, EMAIL_TREND_CONVERSION_CID } from '@/lib/email-trend-cids';
 import type { ServiceOverviewRow } from '@/lib/email-report-layout';
@@ -179,6 +180,11 @@ function fmtScore(n: number | null): string {
   return n.toFixed(2);
 }
 
+function fmtAvgAgentResponseSeconds(n: number | null): string {
+  if (n == null || Number.isNaN(n)) return EM;
+  return escapeHtml(formatSecondsAsAgentResponseTime(n));
+}
+
 /** Table 1: Bot coverage — client-initiated (consumer) chats only; matches By Conversation dashboard. */
 function renderBotCoverageByConversationTable(report: DailyEmailReportData): string {
   const colToday = escapeHtml(report.columnLabelShort);
@@ -252,12 +258,14 @@ function renderInitiatorComparisonTable(report: DailyEmailReportData): string {
           <td style="${tdBase};text-align:center">${fmtCountPct(mtd.confusedByAgentCount, mtd.confusedByAgentPct)}</td>
           <td style="${tdBase};text-align:center">${fmtScore(today.agentScoreAvg)}</td>
           <td style="${tdBase};text-align:center">${fmtScore(mtd.agentScoreAvg)}</td>
+          <td style="${tdBase};text-align:center">${fmtAvgAgentResponseSeconds(today.averageAgentResponseTimeSeconds)}</td>
+          <td style="${tdBase};text-align:center">${fmtAvgAgentResponseSeconds(mtd.averageAgentResponseTimeSeconds)}</td>
         </tr>`;
   }
 
   return `
     <div style="margin:0 0 8px 0;font-size:14px;font-weight:bold;color:#2c3e50;font-family:${font}">By initiator (By Conversation)</div>
-    <table role="presentation" width="100%" style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:960px;margin:0 0 24px 0;mso-table-lspace:0pt;mso-table-rspace:0pt;" cellspacing="0" cellpadding="0">
+    <table role="presentation" width="100%" style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:1080px;margin:0 0 24px 0;mso-table-lspace:0pt;mso-table-rspace:0pt;" cellspacing="0" cellpadding="0">
       <thead>
         <tr>
           <th style="${thLeft}" rowspan="2">Initiator</th>
@@ -267,8 +275,11 @@ function renderInitiatorComparisonTable(report: DailyEmailReportData): string {
           <th style="${thStyle}" colspan="2">Confused By Bot</th>
           <th style="${thStyle}" colspan="2">Confused By Agent</th>
           <th style="${thStyle}" colspan="2">Agent Score (out of 5)</th>
+          <th style="${thStyle}" colspan="2">Avg Agent Response Time</th>
         </tr>
         <tr>
+          <th style="${thStyle}">${colToday}</th>
+          <th style="${thStyle}">MTD</th>
           <th style="${thStyle}">${colToday}</th>
           <th style="${thStyle}">MTD</th>
           <th style="${thStyle}">${colToday}</th>

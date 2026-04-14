@@ -25,6 +25,10 @@ export interface ChatAnalysisResult {
   confusedBy?: string;
   /** Average or single score from ingest; null if absent. */
   agentScore?: number | null;
+  /** Agent response duration from ingest, e.g. `0 02:15:30` (days + HH:MM:SS). */
+  agentResponseTime?: string | null;
+  /** 1 = unresponsive, 0 = responsive (from ingest). */
+  unresponsive?: number;
 }
 
 /** Precomputed By Conversation tab: Consumer vs Agent initiated sections. */
@@ -49,6 +53,8 @@ export interface ConversationSectionMetrics {
   fullyBotPct: number;
   atLeastOneAgentMessageCount: number;
   atLeastOneAgentMessagePct: number;
+  /** Mean response time in seconds where `agentResponseTime` parsed; null if none. */
+  averageAgentResponseTimeSeconds: number | null;
 }
 
 export interface ByConversationViewData {
@@ -199,6 +205,8 @@ export interface ChatAnalysisRequest {
     frustratedBy?: string;
     confusedBy?: string;
     agentScore?: number | null;
+    agentResponseTime?: string;
+    unresponsive?: number;
   }[];
 }
 

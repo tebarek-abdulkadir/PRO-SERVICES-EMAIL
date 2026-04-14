@@ -39,6 +39,7 @@ export interface InitiatorTableRow {
   confusedByAgentCount: number;
   confusedByAgentPct: number;
   agentScoreAvg: number | null;
+  averageAgentResponseTimeSeconds: number | null;
 }
 
 export interface ByConversationEmailPayload {
@@ -76,6 +77,7 @@ function initiatorRow(s: ConversationSectionMetrics): InitiatorTableRow {
     confusedByAgentCount: s.confusionByAgentCount,
     confusedByAgentPct: s.confusionByAgentPct,
     agentScoreAvg: s.agentScoreAvg,
+    averageAgentResponseTimeSeconds: s.averageAgentResponseTimeSeconds,
   };
 }
 
@@ -86,6 +88,7 @@ function poolInitiatorSections(sections: ConversationSectionMetrics[]): Initiato
   let coB = 0;
   let coA = 0;
   const scoreAvgs: number[] = [];
+  const responseTimeAvgs: number[] = [];
 
   for (const s of sections) {
     tot += s.totalChats;
@@ -95,6 +98,9 @@ function poolInitiatorSections(sections: ConversationSectionMetrics[]): Initiato
     coA += s.confusionByAgentCount;
     if (s.agentScoreAvg != null && !Number.isNaN(s.agentScoreAvg)) {
       scoreAvgs.push(s.agentScoreAvg);
+    }
+    if (s.averageAgentResponseTimeSeconds != null && !Number.isNaN(s.averageAgentResponseTimeSeconds)) {
+      responseTimeAvgs.push(s.averageAgentResponseTimeSeconds);
     }
   }
 
@@ -109,6 +115,9 @@ function poolInitiatorSections(sections: ConversationSectionMetrics[]): Initiato
     confusedByAgentCount: coA,
     confusedByAgentPct: pct(coA, tot),
     agentScoreAvg: scoreAvgs.length ? scoreAvgs.reduce((a, b) => a + b, 0) / scoreAvgs.length : null,
+    averageAgentResponseTimeSeconds: responseTimeAvgs.length
+      ? responseTimeAvgs.reduce((a, b) => a + b, 0) / responseTimeAvgs.length
+      : null,
   };
 }
 

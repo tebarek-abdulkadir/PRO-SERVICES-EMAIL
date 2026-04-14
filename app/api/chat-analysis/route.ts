@@ -18,6 +18,7 @@ import {
   resolveChatMetaForMergedIds,
   type RawChatMetaRow,
 } from '@/lib/chat-conversation-meta-ingest';
+import { normalizeUnresponsive } from '@/lib/chat-agent-response-time';
 import type { ChatAnalysisData, ChatAnalysisRequest, ChatAnalysisResponse, ChatAnalysisResult, ChatDataResponse } from '@/lib/chat-types';
 
 type RawIngestRow = {
@@ -29,6 +30,8 @@ type RawIngestRow = {
   frustratedBy?: string;
   confusedBy?: string;
   agentScore?: number | null;
+  agentResponseTime?: string;
+  unresponsive?: number;
 } & RawIngestEntityFields;
 
 function parseAgentScore(v: unknown): number | null {
@@ -70,6 +73,8 @@ function applyChatAnalysisFromRawIngest(
         frustratedBy: r.frustratedBy,
         confusedBy: r.confusedBy,
         agentScore: r.agentScore,
+        agentResponseTime: r.agentResponseTime,
+        unresponsive: r.unresponsive,
       })
     )
   );
@@ -101,6 +106,10 @@ function applyChatAnalysisFromRawIngest(
       ...(meta.frustratedBy ? { frustratedBy: meta.frustratedBy } : {}),
       ...(meta.confusedBy ? { confusedBy: meta.confusedBy } : {}),
       ...(meta.agentScore != null ? { agentScore: meta.agentScore } : {}),
+      ...(meta.agentResponseTime != null && meta.agentResponseTime !== ''
+        ? { agentResponseTime: meta.agentResponseTime }
+        : {}),
+      unresponsive: meta.unresponsive ?? 0,
     };
   });
 
@@ -305,6 +314,13 @@ export async function POST(request: Request): Promise<NextResponse<ChatAnalysisR
         frustratedBy: str('frustratedBy') ?? str('frustrated_by') ?? str('FrustratedBy'),
         confusedBy: str('confusedBy') ?? str('confused_by') ?? str('ConfusedBy'),
         agentScore: parseAgentScore(rec.agentScore ?? rec.AgentScore ?? rec.agent_score),
+        agentResponseTime:
+          str('agentResponseTime') ??
+          str('AgentResponseTime') ??
+          str('agent_response_time'),
+        unresponsive: normalizeUnresponsive(
+          rec.unresponsive ?? rec.Unresponsive ?? rec.UNRESPONSIVE
+        ),
       };
     });
 

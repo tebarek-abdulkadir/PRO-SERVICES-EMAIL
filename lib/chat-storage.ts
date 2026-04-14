@@ -183,6 +183,8 @@ export async function aggregateDailyChatAnalysisResults(
     maidName?: string;
     contractType?: string;
     joinedSkills?: string;
+    agentResponseTime?: string | null;
+    unresponsive?: number;
   }>,
   analysisDate: string
 ): Promise<ChatAnalysisData> {

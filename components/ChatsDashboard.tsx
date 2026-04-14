@@ -11,6 +11,7 @@ import {
   Bot,
   Headphones,
 } from 'lucide-react';
+import { formatAverageAgentResponseTimeDisplay } from '@/lib/chat-agent-response-time';
 import { dedupeChatConversationResults } from '@/lib/chat-email-metrics';
 import { createEmptyByConversationViewData } from '@/lib/chat-by-conversation-metrics';
 import type {
@@ -81,7 +82,7 @@ function ConversationInitiatorBlock({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl p-6 border-2 border-slate-200 shadow-sm flex flex-col">
           <div className="flex items-center justify-between mb-auto">
             <Bot className="w-6 h-6 text-violet-600" />
@@ -100,6 +101,18 @@ function ConversationInitiatorBlock({
           <div className="mt-auto">
             <div className="text-3xl font-bold text-slate-900 mb-1">{formatAvg(m.agentScoreAvg)}</div>
             <div className="text-sm font-medium text-slate-600">Agent score</div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl p-6 border-2 border-slate-200 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-auto">
+            <Clock className="w-6 h-6 text-sky-600" />
+          </div>
+          <div className="mt-auto">
+            <div className="text-2xl sm:text-3xl font-bold text-slate-900 mb-1 tabular-nums">
+              {formatAverageAgentResponseTimeDisplay(m.averageAgentResponseTimeSeconds)}
+            </div>
+            <div className="text-sm font-medium text-slate-600">Average agent response time</div>
           </div>
         </div>
 
