@@ -11,10 +11,13 @@ function pct(part: number, whole: number): number {
   return Math.round((part / whole) * 10000) / 100;
 }
 
+/** Prefer deriving from `conversationResults` so email MTD matches current rules (same as chat-analysis GET enrichment). */
 function viewFromData(data: ChatAnalysisData | null) {
   if (!data) return null;
+  if (data.conversationResults?.length) {
+    return computeByConversationViewFromResults(data.conversationResults);
+  }
   if (data.byConversationView) return data.byConversationView;
-  if (data.conversationResults?.length) return computeByConversationViewFromResults(data.conversationResults);
   return null;
 }
 

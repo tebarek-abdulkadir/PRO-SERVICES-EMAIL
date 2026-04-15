@@ -14,10 +14,13 @@ function rowConversionRatePercent(r: ServiceOverviewRow): number {
   return (100 * sales) / prospects;
 }
 
+/** Prefer raw rows so trend series match current initiator bucketing (blobs may have stale `byConversationView`). */
 function viewFromData(data: ChatAnalysisData | null) {
   if (!data) return null;
+  if (data.conversationResults?.length) {
+    return computeByConversationViewFromResults(data.conversationResults);
+  }
   if (data.byConversationView) return data.byConversationView;
-  if (data.conversationResults?.length) return computeByConversationViewFromResults(data.conversationResults);
   return null;
 }
 
