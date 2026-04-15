@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Calendar, Clock, TrendingUp, Users, Award, LogIn, LogOut, Timer } from 'lucide-react';
 import type { DelayTimeData, AgentHoursData } from '@/lib/chat-types';
+import { compareAgentDelayStats } from '@/lib/agent-delay-sort';
 import DatePickerCalendar from '@/components/DatePickerCalendar';
 
 export default function AgentsDashboard() {
@@ -255,12 +256,8 @@ export default function AgentsDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {delayData.agentStats
-                  .sort((a, b) => {
-                    const ax = a.avgDelaySeconds ?? Number.POSITIVE_INFINITY;
-                    const bx = b.avgDelaySeconds ?? Number.POSITIVE_INFINITY;
-                    return ax - bx;
-                  })
+                {[...delayData.agentStats]
+                  .sort(compareAgentDelayStats)
                   .map((agent, index) => {
                     const isTopPerformer =
                       index < 3 && agent.avgDelaySeconds != null;
@@ -318,7 +315,11 @@ export default function AgentsDashboard() {
                         <td className="py-4 px-6 text-center">
                           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100">
                             <Clock className="w-4 h-4 text-slate-500" />
-                            <span className="font-bold text-slate-900 text-sm">{agent.avgDelayFormatted}</span>
+                            <span className="font-bold text-slate-900 text-sm">
+                              {agent.avgDelaySeconds == null || agent.avgDelayFormatted === 'N/A'
+                                ? 'N/A'
+                                : agent.avgDelayFormatted}
+                            </span>
                           </div>
                         </td>
                         {agentHoursData && (

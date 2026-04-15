@@ -10,6 +10,7 @@ import type {
   AgentDelayStats,
   AgentResponseTimeRecord
 } from './chat-types';
+import { compareAgentDelayStats } from './agent-delay-sort';
 import { computeByChatsViewMetrics, createEmptyByChatsViewMetrics } from './chat-by-chats-metrics';
 import { createEmptyByConversationViewData } from './chat-by-conversation-metrics';
 import {
@@ -1016,17 +1017,53 @@ function parseLooseHHMMSSToSeconds(timeStr: string): number {
   return Math.floor(h * 3600 + m * 60 + s);
 }
 
-function parseAdjustedResponseTime(raw: string): {
+/** True when the string is clearly HH:MM:SS (or loose seconds), not a label like N/A */
+function looksLikeHHMMSS(timeStr: string): boolean {
+  const p = timeStr.trim().split(':');
+  if (p.length !== 3) return false;
+  return p.every((part) => /^[\d.]+$/i.test(part.trim()));
+}
+
+/** Excel #N/A, unicode, SQL NULL text, etc. */
+function isExplicitNotApplicable(t: string): boolean {
+  if (!t) return true;
+  const c = t
+    .replace(/\s+/g, '')
+    .replace(/[\u2013\u2014\u2212\ufe63\uff0d]/g, '-');
+  return (
+    /^n\/?a$/i.test(c) ||
+    /^#n\/?a$/i.test(c) ||
+    /^(na|n\.a\.|none|null|nil|\*|-+)$/i.test(c) ||
+    /^n[／/]a$/i.test(c)
+  );
+}
+
+function parseAdjustedResponseTime(raw: unknown): {
   seconds: number | null;
   display: string;
 } {
-  const t = raw.trim();
-  const compact = t.replace(/\s/g, '');
-  if (!t || /^n\/?a$/i.test(compact) || t === '-') {
+  const t0 = String(raw ?? '')
+    .normalize('NFKC')
+    .trim();
+  if (!t0 || isExplicitNotApplicable(t0)) {
     return { seconds: null, display: 'N/A' };
   }
-  const sec = parseLooseHHMMSSToSeconds(t);
+  const sec = parseLooseHHMMSSToSeconds(t0);
+  // Junk like "N/A" falls through parsers as 0; only accept 0 when it looks like a real clock time
+  if (sec === 0 && !looksLikeHHMMSS(t0)) {
+    return { seconds: null, display: 'N/A' };
+  }
   return { seconds: sec, display: formatSecondsToTime(sec) };
+}
+
+function normalizeDelayStatRow(s: AgentDelayStats): AgentDelayStats {
+  if (s.avgDelayFormatted === 'N/A') {
+    return { ...s, avgDelaySeconds: null, avgDelayFormatted: 'N/A' };
+  }
+  if (s.avgDelaySeconds == null || !Number.isFinite(s.avgDelaySeconds)) {
+    return { ...s, avgDelaySeconds: null, avgDelayFormatted: 'N/A' };
+  }
+  return s;
 }
 
 /**
@@ -1123,9 +1160,11 @@ function normalizeAgentResponseTimeName(name: string): string {
  * Used when serving stored JSON that may have been saved before deduplication was applied.
  */
 export function dedupeAgentStatsForDay(stats: AgentDelayStats[]): AgentDelayStats[] {
+  const normalizedIn = stats.map(normalizeDelayStatRow);
+
   const byAgent = new Map<string, { displayName: string; delays: (number | null)[] }>();
 
-  for (const s of stats) {
+  for (const s of normalizedIn) {
     const key = normalizeAgentResponseTimeName(s.agentName);
     let entry = byAgent.get(key);
     if (!entry) {
@@ -1154,11 +1193,7 @@ export function dedupeAgentStatsForDay(stats: AgentDelayStats[]): AgentDelayStat
         avgDelayFormatted: formatSecondsToTime(avgDelaySeconds),
       };
     })
-    .sort((a, b) => {
-      const ax = a.avgDelaySeconds ?? Number.POSITIVE_INFINITY;
-      const bx = b.avgDelaySeconds ?? Number.POSITIVE_INFINITY;
-      return ax - bx;
-    });
+    .sort(compareAgentDelayStats);
 }
 
 /**
