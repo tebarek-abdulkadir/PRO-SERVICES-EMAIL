@@ -1,3 +1,7 @@
+import {
+  countryKeyCountsAsVisaSchengen,
+  VISA_SCHENGEN_SALES_EMAIL_ROW_ALIASES,
+} from '@/lib/eu-member-countries';
 import type { EmailSalesCcMvSplit } from '@/lib/prospects-report';
 import type { ByContractType } from '@/lib/types';
 import type { EnrichedProspectDetail } from '@/lib/prospects-report';
@@ -129,22 +133,15 @@ export function buildServiceOverviewRows(
   const mv = countryCountsByContractType.MV;
   const cc = countryCountsByContractType.CC;
 
-  const schengenProspectMatchers = [
-    (k: string) => matchAliases(k, ['schengen']),
-    (k: string) => matchAliases(k, ['turkey', 'türkiye', 'turkiye']),
-    (k: string) => matchAliases(k, ['golden visa', 'golden']),
-    (k: string) => matchAliases(k, ['family visa', 'family']),
-    (k: string) => matchAliases(k, ['gcc', 'g.c.c', 'gulf']),
-  ];
-
   const pLebanonMv = countryCountsMatching(mv, [(k) => matchAliases(k, ['lebanon'])]);
   const pLebanonCc = countryCountsMatching(cc, [(k) => matchAliases(k, ['lebanon'])]);
   const pEgyptMv = countryCountsMatching(mv, [(k) => matchAliases(k, ['egypt'])]);
   const pEgyptCc = countryCountsMatching(cc, [(k) => matchAliases(k, ['egypt'])]);
   const pJordanMv = countryCountsMatching(mv, [(k) => matchAliases(k, ['jordan'])]);
   const pJordanCc = countryCountsMatching(cc, [(k) => matchAliases(k, ['jordan'])]);
-  const pSchengenMv = countryCountsMatching(mv, schengenProspectMatchers);
-  const pSchengenCc = countryCountsMatching(cc, schengenProspectMatchers);
+  /** EU members + legacy Schengen-area tokens — aligned with `EMAIL_TRAVEL_REGIONS` / sales split. */
+  const pSchengenMv = countryCountsMatching(mv, [(k) => countryKeyCountsAsVisaSchengen(k)]);
+  const pSchengenCc = countryCountsMatching(cc, [(k) => countryKeyCountsAsVisaSchengen(k)]);
 
   const travelSales = emailSalesCcMv.travel;
   const oecSales = emailSalesCcMv.oec;
@@ -234,7 +231,7 @@ export function buildSalesEmailRows(details: EnrichedProspectDetail[]): EmailRep
     { label: 'Visa to Lebanon', aliases: ['lebanon'] },
     { label: 'Visa to Egypt', aliases: ['egypt'] },
     { label: 'Travel to Jordan', aliases: ['jordan'] },
-    { label: 'Schengen', aliases: ['schengen'] },
+    { label: 'Schengen', aliases: [...VISA_SCHENGEN_SALES_EMAIL_ROW_ALIASES] },
     { label: 'Golden Visa', aliases: ['golden visa', 'golden'] },
     { label: 'Family Visa', aliases: ['family visa', 'family'] },
     { label: 'GCC', aliases: ['gcc', 'g.c.c', 'gulf'] },

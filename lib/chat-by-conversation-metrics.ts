@@ -147,8 +147,8 @@ function computeSection(
 
 /**
  * Dedupe by conversationId, split by initiator (case-insensitive).
- * Consumer Initiated = initiator consumer | bot. Agent Initiated = agent.
- * Rows without initiator are excluded from both sections and counted in excludedNoInitiator.
+ * Consumer Initiated = initiator consumer | bot, or missing/unknown initiator (defaults here).
+ * Agent Initiated = agent only.
  */
 export function computeByConversationViewFromResults(
   results: ChatAnalysisResult[]
@@ -156,27 +156,19 @@ export function computeByConversationViewFromResults(
   const deduped = dedupeChatConversationResults(results);
   const consumer: ChatAnalysisResult[] = [];
   const agent: ChatAnalysisResult[] = [];
-  let excludedNoInitiator = 0;
 
   for (const r of deduped) {
-    const ini = r.initiator;
-    if (!ini || !norm(ini)) {
-      excludedNoInitiator++;
-      continue;
-    }
-    if (isConsumerInitiatedBucket(ini)) {
-      consumer.push(r);
-    } else if (isAgentInitiatedBucket(ini)) {
+    if (isAgentInitiatedBucket(r.initiator)) {
       agent.push(r);
     } else {
-      excludedNoInitiator++;
+      consumer.push(r);
     }
   }
 
   return {
     consumerInitiated: computeSection(consumer, { includeChatbotBlock: true }),
     agentInitiated: computeSection(agent, { includeChatbotBlock: false }),
-    excludedNoInitiator,
+    excludedNoInitiator: 0,
   };
 }
 

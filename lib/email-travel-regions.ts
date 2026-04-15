@@ -1,24 +1,17 @@
 /** Travel visa rows in the daily email; first matching region wins (same as dashboard allocation intent). */
 
+import {
+  EU_MEMBER_COUNTRY_ALIAS_TOKENS,
+  VISA_SCHENGEN_NON_EU_ALIAS_TOKENS,
+} from '@/lib/eu-member-countries';
+
 export const EMAIL_TRAVEL_REGIONS: { key: string; aliases: string[] }[] = [
   { key: 'Visa Lebanon', aliases: ['lebanon'] },
   { key: 'Visa Egypt', aliases: ['egypt'] },
   { key: 'Visa Jordan', aliases: ['jordan'] },
   {
     key: 'Visa Schengen',
-    aliases: [
-      'schengen',
-      'turkey',
-      'türkiye',
-      'turkiye',
-      'golden visa',
-      'golden',
-      'family visa',
-      'family',
-      'gcc',
-      'g.c.c',
-      'gulf',
-    ],
+    aliases: [...VISA_SCHENGEN_NON_EU_ALIAS_TOKENS, ...EU_MEMBER_COUNTRY_ALIAS_TOKENS],
   },
 ];
 
