@@ -1000,6 +1000,35 @@ function parseResponseTimeToSeconds(timeStr: string): number {
   return 0;
 }
 
+/** Tolerates odd seconds tokens (e.g. 00:01:7.) from upstream exports */
+function parseLooseHHMMSSToSeconds(timeStr: string): number {
+  const trimmed = timeStr.trim();
+  const parts = trimmed.split(':').map((p) => p.trim());
+  if (parts.length !== 3) {
+    return parseResponseTimeToSeconds(trimmed);
+  }
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  const s = parseFloat(parts[2]);
+  if (Number.isNaN(h) || Number.isNaN(m) || Number.isNaN(s)) {
+    return 0;
+  }
+  return Math.floor(h * 3600 + m * 60 + s);
+}
+
+function parseAdjustedResponseTime(raw: string): {
+  seconds: number | null;
+  display: string;
+} {
+  const t = raw.trim();
+  const compact = t.replace(/\s/g, '');
+  if (!t || /^n\/?a$/i.test(compact) || t === '-') {
+    return { seconds: null, display: 'N/A' };
+  }
+  const sec = parseLooseHHMMSSToSeconds(t);
+  return { seconds: sec, display: formatSecondsToTime(sec) };
+}
+
 /**
  * Format seconds to HH:MM:SS
  */
@@ -1094,7 +1123,7 @@ function normalizeAgentResponseTimeName(name: string): string {
  * Used when serving stored JSON that may have been saved before deduplication was applied.
  */
 export function dedupeAgentStatsForDay(stats: AgentDelayStats[]): AgentDelayStats[] {
-  const byAgent = new Map<string, { displayName: string; delays: number[] }>();
+  const byAgent = new Map<string, { displayName: string; delays: (number | null)[] }>();
 
   for (const s of stats) {
     const key = normalizeAgentResponseTimeName(s.agentName);
@@ -1108,8 +1137,16 @@ export function dedupeAgentStatsForDay(stats: AgentDelayStats[]): AgentDelayStat
 
   return Array.from(byAgent.values())
     .map(({ displayName, delays }) => {
+      const numeric = delays.filter((d): d is number => d != null && Number.isFinite(d));
+      if (numeric.length === 0) {
+        return {
+          agentName: displayName,
+          avgDelaySeconds: null,
+          avgDelayFormatted: 'N/A',
+        };
+      }
       const avgDelaySeconds = Math.round(
-        delays.reduce((sum, d) => sum + d, 0) / delays.length
+        numeric.reduce((sum, d) => sum + d, 0) / numeric.length
       );
       return {
         agentName: displayName,
@@ -1117,7 +1154,11 @@ export function dedupeAgentStatsForDay(stats: AgentDelayStats[]): AgentDelayStat
         avgDelayFormatted: formatSecondsToTime(avgDelaySeconds),
       };
     })
-    .sort((a, b) => a.avgDelaySeconds - b.avgDelaySeconds);
+    .sort((a, b) => {
+      const ax = a.avgDelaySeconds ?? Number.POSITIVE_INFINITY;
+      const bx = b.avgDelaySeconds ?? Number.POSITIVE_INFINITY;
+      return ax - bx;
+    });
 }
 
 /**
@@ -1143,8 +1184,11 @@ export function processAgentResponseTimeRecords(
   let dailyAverageDelayFormatted: string | undefined;
   
   if (totalRecord) {
-    dailyAverageDelaySeconds = parseResponseTimeToSeconds(totalRecord.AVG_ADJUSTED_RESPONSE_TIME);
-    dailyAverageDelayFormatted = totalRecord.AVG_ADJUSTED_RESPONSE_TIME; // Already in HH:MM:SS format
+    const totalParsed = parseAdjustedResponseTime(totalRecord.AVG_ADJUSTED_RESPONSE_TIME);
+    if (totalParsed.seconds !== null) {
+      dailyAverageDelaySeconds = totalParsed.seconds;
+      dailyAverageDelayFormatted = totalParsed.display;
+    }
   }
 
   const rawStats: AgentDelayStats[] = [];
@@ -1152,11 +1196,11 @@ export function processAgentResponseTimeRecords(
   for (const record of records) {
     if (record.AGENT_FULL_NAME === 'Total') continue;
 
-    const delaySeconds = parseResponseTimeToSeconds(record.AVG_ADJUSTED_RESPONSE_TIME);
+    const parsed = parseAdjustedResponseTime(record.AVG_ADJUSTED_RESPONSE_TIME);
     rawStats.push({
       agentName: record.AGENT_FULL_NAME.trim().replace(/\s+/g, ' '),
-      avgDelaySeconds: delaySeconds,
-      avgDelayFormatted: record.AVG_ADJUSTED_RESPONSE_TIME,
+      avgDelaySeconds: parsed.seconds === null ? null : parsed.seconds,
+      avgDelayFormatted: parsed.display,
     });
   }
 

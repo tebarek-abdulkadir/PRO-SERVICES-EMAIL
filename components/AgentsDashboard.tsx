@@ -256,7 +256,11 @@ export default function AgentsDashboard() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {delayData.agentStats
-                  .sort((a, b) => a.avgDelaySeconds - b.avgDelaySeconds)
+                  .sort((a, b) => {
+                    const ax = a.avgDelaySeconds ?? Number.POSITIVE_INFINITY;
+                    const bx = b.avgDelaySeconds ?? Number.POSITIVE_INFINITY;
+                    return ax - bx;
+                  })
                   .map((agent, index) => {
                     const isTopPerformer = index < 3;
                     

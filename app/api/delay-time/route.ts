@@ -11,8 +11,34 @@ import { list } from '@vercel/blob';
 
 export async function POST(request: Request) {
   try {
-    const body: DelayTimeRequest = await request.json();
-    
+    const raw: unknown = await request.json();
+    let body: DelayTimeRequest;
+
+    if (Array.isArray(raw)) {
+      if (raw.length === 0 || raw[0] == null || typeof raw[0] !== 'object') {
+        return NextResponse.json<DelayTimeResponse>(
+          {
+            success: false,
+            message: 'Invalid request format',
+            error: 'When sending an array, provide a single object with analysisDate and records',
+          },
+          { status: 400 }
+        );
+      }
+      body = raw[0] as DelayTimeRequest;
+    } else if (raw && typeof raw === 'object') {
+      body = raw as DelayTimeRequest;
+    } else {
+      return NextResponse.json<DelayTimeResponse>(
+        {
+          success: false,
+          message: 'Invalid request format',
+          error: 'Request body must be a JSON object or a one-element array',
+        },
+        { status: 400 }
+      );
+    }
+
     // Validate request
     if (!body.records || !Array.isArray(body.records)) {
       return NextResponse.json<DelayTimeResponse>({

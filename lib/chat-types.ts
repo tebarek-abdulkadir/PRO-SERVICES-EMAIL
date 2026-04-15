@@ -240,13 +240,15 @@ export interface AgentDelayRecord {
 export interface AgentResponseTimeRecord {
   REPORT_DATE: string; // Format: YYYY-MM-DD
   AGENT_FULL_NAME: string; // Agent name, or "Total" for daily average
-  AVG_ADJUSTED_RESPONSE_TIME: string; // Format: HH:MM:SS
+  /** HH:MM:SS (loose seconds allowed, e.g. 00:01:7.) or N/A when no metric */
+  AVG_ADJUSTED_RESPONSE_TIME: string;
 }
 
 export interface AgentDelayStats {
   agentName: string;
-  avgDelaySeconds: number;
-  avgDelayFormatted: string; // HH:MM:SS format
+  /** null when response time is N/A (serializes safely; Infinity does not) */
+  avgDelaySeconds: number | null;
+  avgDelayFormatted: string; // HH:MM:SS or N/A
 }
 
 export interface DelayTimeData {
@@ -261,6 +263,9 @@ export interface DelayTimeRequest {
   analysisDate?: string; // Optional - can be extracted from REPORT_DATE in records
   records: AgentResponseTimeRecord[];
 }
+
+/** POST body may be a single object or a one-element array (automation wrappers). */
+export type DelayTimeRequestPayload = DelayTimeRequest | DelayTimeRequest[];
 
 export interface DelayTimeResponse {
   success: boolean;
