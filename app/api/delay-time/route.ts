@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { processDelayTimeRecords, processAgentResponseTimeRecords, saveDelayTimeData, getLatestDelayTimeData } from '@/lib/chat-storage';
+import { processDelayTimeRecords, processAgentResponseTimeRecords, saveDelayTimeData, getLatestDelayTimeData, dedupeAgentStatsForDay } from '@/lib/chat-storage';
 import type { DelayTimeRequest, DelayTimeResponse } from '@/lib/chat-types';
 import { list } from '@vercel/blob';
 
@@ -139,7 +139,14 @@ export async function GET(request: Request) {
         message: date ? `No delay time data available for ${date}` : 'No delay time data available yet',
       });
     }
-    
+
+    if (delayData.agentStats?.length) {
+      delayData = {
+        ...delayData,
+        agentStats: dedupeAgentStatsForDay(delayData.agentStats),
+      };
+    }
+
     return NextResponse.json({
       success: true,
       data: delayData,

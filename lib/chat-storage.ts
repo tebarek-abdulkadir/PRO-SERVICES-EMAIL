@@ -1084,9 +1084,46 @@ export function processDelayTimeRecords(
   };
 }
 
+/** Stable key so duplicate rows for the same person (e.g. per skill) merge into one daily stat */
+function normalizeAgentResponseTimeName(name: string): string {
+  return name.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/**
+ * One combined row per agent (average of duplicate rows). Idempotent if already unique.
+ * Used when serving stored JSON that may have been saved before deduplication was applied.
+ */
+export function dedupeAgentStatsForDay(stats: AgentDelayStats[]): AgentDelayStats[] {
+  const byAgent = new Map<string, { displayName: string; delays: number[] }>();
+
+  for (const s of stats) {
+    const key = normalizeAgentResponseTimeName(s.agentName);
+    let entry = byAgent.get(key);
+    if (!entry) {
+      entry = { displayName: s.agentName.trim().replace(/\s+/g, ' '), delays: [] };
+      byAgent.set(key, entry);
+    }
+    entry.delays.push(s.avgDelaySeconds);
+  }
+
+  return Array.from(byAgent.values())
+    .map(({ displayName, delays }) => {
+      const avgDelaySeconds = Math.round(
+        delays.reduce((sum, d) => sum + d, 0) / delays.length
+      );
+      return {
+        agentName: displayName,
+        avgDelaySeconds,
+        avgDelayFormatted: formatSecondsToTime(avgDelaySeconds),
+      };
+    })
+    .sort((a, b) => a.avgDelaySeconds - b.avgDelaySeconds);
+}
+
 /**
  * Process per-agent response time records (new format)
- * Filters out "Total" entries as they represent daily average
+ * Filters out "Total" entries as they represent daily average.
+ * Multiple rows per agent are averaged (reports often emit one row per skill/queue).
  */
 export function processAgentResponseTimeRecords(
   records: AgentResponseTimeRecord[],
@@ -1110,19 +1147,20 @@ export function processAgentResponseTimeRecords(
     dailyAverageDelayFormatted = totalRecord.AVG_ADJUSTED_RESPONSE_TIME; // Already in HH:MM:SS format
   }
 
-  // Filter out "Total" entries and process per-agent data
-  const agentStats: AgentDelayStats[] = records
-    .filter(record => record.AGENT_FULL_NAME !== 'Total')
-    .map(record => {
-      const delaySeconds = parseResponseTimeToSeconds(record.AVG_ADJUSTED_RESPONSE_TIME);
-      
-      return {
-        agentName: record.AGENT_FULL_NAME,
-        avgDelaySeconds: delaySeconds,
-        avgDelayFormatted: record.AVG_ADJUSTED_RESPONSE_TIME, // Already in HH:MM:SS format
-      };
-    })
-    .sort((a, b) => a.avgDelaySeconds - b.avgDelaySeconds); // Sort by fastest first
+  const rawStats: AgentDelayStats[] = [];
+
+  for (const record of records) {
+    if (record.AGENT_FULL_NAME === 'Total') continue;
+
+    const delaySeconds = parseResponseTimeToSeconds(record.AVG_ADJUSTED_RESPONSE_TIME);
+    rawStats.push({
+      agentName: record.AGENT_FULL_NAME.trim().replace(/\s+/g, ' '),
+      avgDelaySeconds: delaySeconds,
+      avgDelayFormatted: record.AVG_ADJUSTED_RESPONSE_TIME,
+    });
+  }
+
+  const agentStats = dedupeAgentStatsForDay(rawStats);
 
   return {
     lastUpdated: new Date().toISOString(),
