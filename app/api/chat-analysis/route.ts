@@ -153,7 +153,8 @@ function enrichChatDataForGet(data: ChatAnalysisData): ChatAnalysisData {
       next = { ...next, byChatsView: computeByChatsViewMetrics(rows) };
     }
   }
-  if (next.byConversationView == null && next.conversationResults?.length) {
+  /** Always derive from `conversationResults` so initiator rules stay in sync (blob may hold stale precomputed rows). */
+  if (next.conversationResults?.length) {
     next = {
       ...next,
       byConversationView: computeByConversationViewFromResults(next.conversationResults),
