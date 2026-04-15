@@ -262,7 +262,8 @@ export default function AgentsDashboard() {
                     return ax - bx;
                   })
                   .map((agent, index) => {
-                    const isTopPerformer = index < 3;
+                    const isTopPerformer =
+                      index < 3 && agent.avgDelaySeconds != null;
                     
                     
                     // Find matching agent hours data
