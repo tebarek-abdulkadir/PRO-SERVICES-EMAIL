@@ -1,10 +1,12 @@
 /**
- * MTD "daily average" for email tables: mean of daily values, excluding days where
- * that metric is null/undefined/NaN, and (by default) zero (no activity that day for that field).
+ * MTD "daily average" for email tables: mean of daily values for **that metric only**.
+ * Drops null/undefined/NaN (day had no value for this metric). **Zero is a valid value** and
+ * does not remove the day from this metric’s average; other metrics use their own series.
+ * Pass `excludeZero: true` only if a metric must ignore true-zero days.
  */
 export function eligibleDailyMean(
   values: (number | null | undefined)[],
-  excludeZero = true
+  excludeZero = false
 ): number {
   const nums: number[] = [];
   for (const x of values) {

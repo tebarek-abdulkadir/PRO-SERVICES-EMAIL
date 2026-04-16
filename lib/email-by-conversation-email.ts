@@ -91,9 +91,10 @@ function initiatorRow(s: ConversationSectionMetrics): InitiatorTableRow {
   };
 }
 
+/** Mean of nullable metrics per day; only null/NaN omit a day (zero is valid). */
 function eligibleNullableMean(values: (number | null | undefined)[]): number | null {
   const nums = values.filter(
-    (x): x is number => x != null && typeof x === 'number' && !Number.isNaN(x) && x !== 0
+    (x): x is number => x != null && typeof x === 'number' && !Number.isNaN(x)
   );
   if (nums.length === 0) return null;
   return Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 1000) / 1000;

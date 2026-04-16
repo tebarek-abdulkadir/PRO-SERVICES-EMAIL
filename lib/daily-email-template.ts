@@ -136,7 +136,7 @@ function renderServiceOverviewTable(
     </table>
     ${
       periodNote
-        ? `<div style="font-size:10px;color:#757575;margin:8px 0 0 0;line-height:1.35;">MTD Daily Avg and LM daily averages: for each cell, only days where that metric is non-null and non-zero are averaged (up to ${periodNote.mtdDaysCounted} MTD day(s) and ${periodNote.lmDaysCounted} LM day(s) with saved prospect data).</div>`
+        ? `<div style="font-size:10px;color:#757575;margin:8px 0 0 0;line-height:1.35;">MTD Daily Avg / LM: each cell averages only days where that metric exists (missing data omitted). Zeros are included. Denominators can differ by metric. Up to ${periodNote.mtdDaysCounted} MTD day(s) and ${periodNote.lmDaysCounted} LM day(s) with prospect snapshots.</div>`
         : ''
     }`;
 }
@@ -202,7 +202,7 @@ function renderBotCoverageByConversationTable(report: DailyEmailReportData): str
   const m = b.consumerBotCoverageMtd;
   const mtdNote =
     b.mtdDaysWithChatData > 0
-      ? `MTD values are daily averages over ${b.mtdDaysWithChatData} day(s) in this month with saved chat data (days without blobs omitted). For each metric, days where that value is null or zero are excluded from that metric average.`
+      ? `MTD values are daily averages: each metric uses only days where that metric has a value (missing/null omitted). Zero counts for that metric. Up to ${b.mtdDaysWithChatData} day(s) in this month had saved chat data.`
       : 'No MTD data.';
 
   return `
