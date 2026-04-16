@@ -24,7 +24,8 @@ function emptyInitiatorRow(): InitiatorTableRow {
 /** Same as GET /api/chat-analysis: enrich blob then read `byConversationView` (never stale MTD vs dashboard). */
 function viewFromData(data: ChatAnalysisData | null) {
   if (!data) return null;
-  return enrichChatAnalysisData(data).byConversationView ?? null;
+  const enriched = enrichChatAnalysisData(data);
+  return enriched.byConversationView ?? data.byConversationView ?? null;
 }
 
 export interface ConsumerBotCoverageSlice {

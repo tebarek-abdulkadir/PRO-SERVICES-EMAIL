@@ -28,6 +28,9 @@ export function enrichChatAnalysisData(data: ChatAnalysisData): ChatAnalysisData
       ...next,
       byConversationView: computeByConversationViewFromResults(next.conversationResults),
     };
+  } else if (next.byConversationView == null && data.byConversationView != null) {
+    /** Blobs saved with precomputed view only (no or empty conversationResults) — keep dashboard/email aligned */
+    next = { ...next, byConversationView: data.byConversationView };
   }
   return next;
 }

@@ -17,7 +17,8 @@ function rowConversionRatePercent(r: ServiceOverviewRow): number {
 /** Same enrichment as dashboard GET so trend charts match Chats / By Conversation. */
 function viewFromData(data: ChatAnalysisData | null) {
   if (!data) return null;
-  return enrichChatAnalysisData(data).byConversationView ?? null;
+  const enriched = enrichChatAnalysisData(data);
+  return enriched.byConversationView ?? data.byConversationView ?? null;
 }
 
 export type EmailChatBreakdown = {
