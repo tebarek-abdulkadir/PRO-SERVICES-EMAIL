@@ -144,6 +144,7 @@ export function buildServiceOverviewRows(
   const pSchengenCc = countryCountsMatching(cc, [(k) => countryKeyCountsAsVisaSchengen(k)]);
 
   const travelSales = emailSalesCcMv.travel;
+  const visa = (key: string) => travelSales[key] ?? { cc: 0, mv: 0 };
   const oecSales = emailSalesCcMv.oec;
   const owwaSales = emailSalesCcMv.owwa;
   const filSales = emailSalesCcMv.filipinaPassportRenewal;
@@ -168,29 +169,29 @@ export function buildServiceOverviewRows(
       'Visa Lebanon',
       pLebanonCc,
       pLebanonMv,
-      travelSales['Visa Lebanon'].cc,
-      travelSales['Visa Lebanon'].mv
+      visa('Visa Lebanon').cc,
+      visa('Visa Lebanon').mv
     ),
     serviceOverviewRow(
       'Visa Egypt',
       pEgyptCc,
       pEgyptMv,
-      travelSales['Visa Egypt'].cc,
-      travelSales['Visa Egypt'].mv
+      visa('Visa Egypt').cc,
+      visa('Visa Egypt').mv
     ),
     serviceOverviewRow(
       'Visa Jordan',
       pJordanCc,
       pJordanMv,
-      travelSales['Visa Jordan'].cc,
-      travelSales['Visa Jordan'].mv
+      visa('Visa Jordan').cc,
+      visa('Visa Jordan').mv
     ),
     serviceOverviewRow(
       'Visa Schengen',
       pSchengenCc,
       pSchengenMv,
-      travelSales['Visa Schengen'].cc,
-      travelSales['Visa Schengen'].mv
+      visa('Visa Schengen').cc,
+      visa('Visa Schengen').mv
     ),
     serviceOverviewRow(
       'Passport Filipina',

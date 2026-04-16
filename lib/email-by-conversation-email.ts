@@ -1,7 +1,5 @@
-import {
-  computeByConversationViewFromResults,
-  createEmptyByConversationViewData,
-} from '@/lib/chat-by-conversation-metrics';
+import { enrichChatAnalysisData } from '@/lib/chat-analysis-enrich';
+import { createEmptyByConversationViewData } from '@/lib/chat-by-conversation-metrics';
 import { getDailyChatAnalysisData } from '@/lib/chat-storage';
 import { mtdDateRange } from '@/lib/email-report-periods';
 import type { ChatAnalysisData, ConversationSectionMetrics } from '@/lib/chat-types';
@@ -11,14 +9,10 @@ function pct(part: number, whole: number): number {
   return Math.round((part / whole) * 10000) / 100;
 }
 
-/** Prefer deriving from `conversationResults` so email MTD matches current rules (same as chat-analysis GET enrichment). */
+/** Same as GET /api/chat-analysis: enrich blob then read `byConversationView` (never stale MTD vs dashboard). */
 function viewFromData(data: ChatAnalysisData | null) {
   if (!data) return null;
-  if (data.conversationResults?.length) {
-    return computeByConversationViewFromResults(data.conversationResults);
-  }
-  if (data.byConversationView) return data.byConversationView;
-  return null;
+  return enrichChatAnalysisData(data).byConversationView ?? null;
 }
 
 export interface ConsumerBotCoverageSlice {

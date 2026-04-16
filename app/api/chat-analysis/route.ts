@@ -19,6 +19,7 @@ import {
   type RawChatMetaRow,
 } from '@/lib/chat-conversation-meta-ingest';
 import { normalizeUnresponsive } from '@/lib/chat-agent-response-time';
+import { enrichChatAnalysisData } from '@/lib/chat-analysis-enrich';
 import type { ChatAnalysisData, ChatAnalysisRequest, ChatAnalysisResponse, ChatAnalysisResult, ChatDataResponse } from '@/lib/chat-types';
 
 type RawIngestRow = {
@@ -138,29 +139,7 @@ export const revalidate = 0;
 
 /** Older blobs may omit byChatsView / byConversationView; compute on read when possible. */
 function enrichChatDataForGet(data: ChatAnalysisData): ChatAnalysisData {
-  let next = data;
-  if (data.byChatsView == null) {
-    const rows =
-      data.conversationResults
-        ?.filter((r) => r.joinedSkills?.trim())
-        .map((r) => ({
-          conversationId: r.conversationId,
-          frustrated: r.frustrated,
-          confused: r.confused,
-          joinedSkills: r.joinedSkills!,
-        })) ?? [];
-    if (rows.length > 0) {
-      next = { ...next, byChatsView: computeByChatsViewMetrics(rows) };
-    }
-  }
-  /** Always derive from `conversationResults` so initiator rules stay in sync (blob may hold stale precomputed rows). */
-  if (next.conversationResults?.length) {
-    next = {
-      ...next,
-      byConversationView: computeByConversationViewFromResults(next.conversationResults),
-    };
-  }
-  return next;
+  return enrichChatAnalysisData(data);
 }
 
 /**

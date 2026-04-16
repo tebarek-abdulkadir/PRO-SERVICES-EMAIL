@@ -1,5 +1,5 @@
+import { enrichChatAnalysisData } from '@/lib/chat-analysis-enrich';
 import { getDailyChatAnalysisData } from '@/lib/chat-storage';
-import { computeByConversationViewFromResults } from '@/lib/chat-by-conversation-metrics';
 import { SERVICE_OVERVIEW_PRODUCT_LABELS, type ServiceOverviewRow } from '@/lib/email-report-layout';
 import { tryLoadServiceOverviewForDate } from '@/lib/email-report-periods';
 import type { ChatAnalysisData } from '@/lib/chat-types';
@@ -14,14 +14,10 @@ function rowConversionRatePercent(r: ServiceOverviewRow): number {
   return (100 * sales) / prospects;
 }
 
-/** Prefer raw rows so trend series match current initiator bucketing (blobs may have stale `byConversationView`). */
+/** Same enrichment as dashboard GET so trend charts match Chats / By Conversation. */
 function viewFromData(data: ChatAnalysisData | null) {
   if (!data) return null;
-  if (data.conversationResults?.length) {
-    return computeByConversationViewFromResults(data.conversationResults);
-  }
-  if (data.byConversationView) return data.byConversationView;
-  return null;
+  return enrichChatAnalysisData(data).byConversationView ?? null;
 }
 
 export type EmailChatBreakdown = {

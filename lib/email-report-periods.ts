@@ -87,17 +87,25 @@ export function emailChatTrendDateRange(reportDate: string): string[] {
  * Load service overview rows for one day. Returns null if prospects/sales data is missing
  * (no blob, incomplete payload, etc.) so the day is excluded from MTD/LM averages.
  */
+const LOAD_SERVICE_OVERVIEW_RETRIES = 3;
+const LOAD_SERVICE_OVERVIEW_RETRY_MS = 250;
+
 export async function tryLoadServiceOverviewForDate(date: string): Promise<ServiceOverviewRow[] | null> {
-  try {
-    const d = await getDashboardProspectsData(date);
-    if (!d.emailSalesCcMv || !d.byContractType) {
-      return null;
+  for (let attempt = 0; attempt < LOAD_SERVICE_OVERVIEW_RETRIES; attempt++) {
+    try {
+      const d = await getDashboardProspectsData(date);
+      if (!d.emailSalesCcMv || !d.byContractType) {
+        return null;
+      }
+      const ccCt = d.countryCountsByContractType || { MV: {}, CC: {} };
+      return buildServiceOverviewRows(d.byContractType, ccCt, d.emailSalesCcMv);
+    } catch {
+      if (attempt < LOAD_SERVICE_OVERVIEW_RETRIES - 1) {
+        await new Promise((r) => setTimeout(r, LOAD_SERVICE_OVERVIEW_RETRY_MS));
+      }
     }
-    const ccCt = d.countryCountsByContractType || { MV: {}, CC: {} };
-    return buildServiceOverviewRows(d.byContractType, ccCt, d.emailSalesCcMv);
-  } catch {
-    return null;
   }
+  return null;
 }
 
 export async function loadServiceOverviewSnapshots(dates: string[]): Promise<ServiceOverviewRow[][]> {
