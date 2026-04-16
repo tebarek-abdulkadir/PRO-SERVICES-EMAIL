@@ -1,3 +1,4 @@
+import type { ChatAnalysisData } from '@/lib/chat-types';
 import { getDailyChatAnalysisData } from '@/lib/chat-storage';
 
 export interface ChatMtdAverages {
@@ -12,7 +13,10 @@ export async function averageChatRatesForDateRange(dates: string[]): Promise<Cha
     return { frustrationPercentMtdAvg: 0, confusionPercentMtdAvg: 0, chatMtdDaysCounted: 0 };
   }
 
-  const results = await Promise.all(dates.map((d) => getDailyChatAnalysisData(d)));
+  const results: (ChatAnalysisData | null)[] = [];
+  for (const d of dates) {
+    results.push(await getDailyChatAnalysisData(d));
+  }
   const fr: number[] = [];
   const cf: number[] = [];
 
