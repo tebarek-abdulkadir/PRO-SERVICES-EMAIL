@@ -1,3 +1,4 @@
+import { pauseForEmailBlobThrottle } from '@/lib/email-blob-throttle';
 import type { ChatAnalysisData } from '@/lib/chat-types';
 import { getDailyChatAnalysisData } from '@/lib/chat-storage';
 
@@ -16,6 +17,7 @@ export async function averageChatRatesForDateRange(dates: string[]): Promise<Cha
   const results: (ChatAnalysisData | null)[] = [];
   for (const d of dates) {
     results.push(await getDailyChatAnalysisData(d));
+    await pauseForEmailBlobThrottle();
   }
   const fr: number[] = [];
   const cf: number[] = [];

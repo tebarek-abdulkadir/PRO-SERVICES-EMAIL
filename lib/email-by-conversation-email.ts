@@ -1,4 +1,5 @@
 import { enrichChatAnalysisData } from '@/lib/chat-analysis-enrich';
+import { pauseForEmailBlobThrottle } from '@/lib/email-blob-throttle';
 import { createEmptyByConversationViewData } from '@/lib/chat-by-conversation-metrics';
 import { getDailyChatAnalysisData } from '@/lib/chat-storage';
 import { mtdDateRange } from '@/lib/email-report-periods';
@@ -168,10 +169,15 @@ export async function buildByConversationEmailPayload(
   const todayView = viewFromData(resolvedToday) ?? createEmptyByConversationViewData();
 
   const mtdDates = mtdDateRange(reportDate);
-  /** Sequential loads avoid Vercel Blob "Too many concurrent requests" when MTD spans many days. */
+  /** Sequential loads + spacing; reuse `resolvedToday` for report date to skip an extra list/fetch. */
   const dailyData: (ChatAnalysisData | null)[] = [];
   for (const d of mtdDates) {
+    if (d === reportDate) {
+      dailyData.push(resolvedToday);
+      continue;
+    }
     dailyData.push(await getDailyChatAnalysisData(d));
+    await pauseForEmailBlobThrottle();
   }
 
   const dailyConsumerSlices: ConsumerBotCoverageSlice[] = [];
