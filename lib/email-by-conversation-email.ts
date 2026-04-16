@@ -1,5 +1,4 @@
 import { enrichChatAnalysisData } from '@/lib/chat-analysis-enrich';
-import { eligibleDailyMean } from '@/lib/email-eligible-daily-mean';
 import { createEmptyByConversationViewData } from '@/lib/chat-by-conversation-metrics';
 import { getDailyChatAnalysisData } from '@/lib/chat-storage';
 import { mtdDateRange } from '@/lib/email-report-periods';
@@ -53,8 +52,12 @@ export interface InitiatorTableRow {
 }
 
 export interface ByConversationEmailPayload {
-  /** MTD window days that had chat analysis saved (missing calendar days are skipped for all MTD columns). */
+  /** MTD window days that had chat analysis saved (missing calendar days are skipped). */
   mtdDaysWithChatData: number;
+  /** Days in MTD where client-initiated total chats &gt; 0 (By Initiator + Bot Coverage MTD base). */
+  mtdClientInitiatorDaysWithChats: number;
+  /** Days in MTD where agent-initiated total chats &gt; 0. */
+  mtdAgentInitiatorDaysWithChats: number;
   consumerBotCoverageToday: ConsumerBotCoverageSlice;
   consumerBotCoverageMtd: ConsumerBotCoverageSlice;
   clientInitiatedToday: InitiatorTableRow;
@@ -91,7 +94,7 @@ function initiatorRow(s: ConversationSectionMetrics): InitiatorTableRow {
   };
 }
 
-/** Mean of nullable metrics per day; only null/NaN omit a day (zero is valid). */
+/** Mean of nullable metrics per day; only null/NaN omit a day (independent of total-chat days). */
 function eligibleNullableMean(values: (number | null | undefined)[]): number | null {
   const nums = values.filter(
     (x): x is number => x != null && typeof x === 'number' && !Number.isNaN(x)
@@ -100,37 +103,57 @@ function eligibleNullableMean(values: (number | null | undefined)[]): number | n
   return Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 1000) / 1000;
 }
 
-/** MTD = mean of daily values; each field drops null/undefined and zero days for that metric. */
-function averageInitiatorRowsMtd(dailies: InitiatorTableRow[]): InitiatorTableRow {
+function meanDailyPct(values: number[]): number {
+  if (values.length === 0) return 0;
+  return Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 1000) / 1000;
+}
+
+/**
+ * By-initiator MTD (client or agent row):
+ * - Total chats & count columns: sum over days where that row's totalChats &gt; 0.
+ * - Percent columns: unweighted mean of daily % on those same days.
+ * - Agent score & avg response: mean over days where the value is non-null only (separate day set).
+ */
+function initiatorRowMtd(dailies: InitiatorTableRow[]): InitiatorTableRow {
+  const withChats = dailies.filter((d) => d.totalChats > 0);
+  const sum = (pick: (d: InitiatorTableRow) => number) =>
+    withChats.reduce((acc, d) => acc + pick(d), 0);
   return {
-    totalChats: eligibleDailyMean(dailies.map((d) => d.totalChats)),
-    frustratedByBotCount: eligibleDailyMean(dailies.map((d) => d.frustratedByBotCount)),
-    frustratedByBotPct: eligibleDailyMean(dailies.map((d) => d.frustratedByBotPct)),
-    frustratedByAgentCount: eligibleDailyMean(dailies.map((d) => d.frustratedByAgentCount)),
-    frustratedByAgentPct: eligibleDailyMean(dailies.map((d) => d.frustratedByAgentPct)),
-    confusedByBotCount: eligibleDailyMean(dailies.map((d) => d.confusedByBotCount)),
-    confusedByBotPct: eligibleDailyMean(dailies.map((d) => d.confusedByBotPct)),
-    confusedByAgentCount: eligibleDailyMean(dailies.map((d) => d.confusedByAgentCount)),
-    confusedByAgentPct: eligibleDailyMean(dailies.map((d) => d.confusedByAgentPct)),
+    totalChats: sum((d) => d.totalChats),
+    frustratedByBotCount: sum((d) => d.frustratedByBotCount),
+    frustratedByBotPct: meanDailyPct(withChats.map((d) => d.frustratedByBotPct)),
+    frustratedByAgentCount: sum((d) => d.frustratedByAgentCount),
+    frustratedByAgentPct: meanDailyPct(withChats.map((d) => d.frustratedByAgentPct)),
+    confusedByBotCount: sum((d) => d.confusedByBotCount),
+    confusedByBotPct: meanDailyPct(withChats.map((d) => d.confusedByBotPct)),
+    confusedByAgentCount: sum((d) => d.confusedByAgentCount),
+    confusedByAgentPct: meanDailyPct(withChats.map((d) => d.confusedByAgentPct)),
     agentScoreAvg: eligibleNullableMean(dailies.map((d) => d.agentScoreAvg)),
     averageAgentResponseTimeSeconds: eligibleNullableMean(dailies.map((d) => d.averageAgentResponseTimeSeconds)),
   };
 }
 
-function averageConsumerBotCoverageMtd(slices: ConsumerBotCoverageSlice[]): ConsumerBotCoverageSlice {
+/**
+ * Bot coverage (consumer-initiated) MTD: same calendar days for totals, counts, and % —
+ * only days where consumer totalChats &gt; 0. Total chats and counts are sums; percentages are daily means on those days.
+ */
+function consumerBotCoverageMtd(slices: ConsumerBotCoverageSlice[]): ConsumerBotCoverageSlice {
+  const withChats = slices.filter((s) => s.totalChats > 0);
+  const sum = (pick: (s: ConsumerBotCoverageSlice) => number) =>
+    withChats.reduce((acc, s) => acc + pick(s), 0);
   return {
-    totalChats: eligibleDailyMean(slices.map((s) => s.totalChats)),
-    botCoverageCount: eligibleDailyMean(slices.map((s) => s.botCoverageCount)),
-    botCoveragePct: eligibleDailyMean(slices.map((s) => s.botCoveragePct)),
-    fullyBotCount: eligibleDailyMean(slices.map((s) => s.fullyBotCount)),
-    fullyBotPct: eligibleDailyMean(slices.map((s) => s.fullyBotPct)),
-    atLeastOneAgentCount: eligibleDailyMean(slices.map((s) => s.atLeastOneAgentCount)),
-    atLeastOneAgentPct: eligibleDailyMean(slices.map((s) => s.atLeastOneAgentPct)),
+    totalChats: sum((s) => s.totalChats),
+    botCoverageCount: sum((s) => s.botCoverageCount),
+    botCoveragePct: meanDailyPct(withChats.map((s) => s.botCoveragePct)),
+    fullyBotCount: sum((s) => s.fullyBotCount),
+    fullyBotPct: meanDailyPct(withChats.map((s) => s.fullyBotPct)),
+    atLeastOneAgentCount: sum((s) => s.atLeastOneAgentCount),
+    atLeastOneAgentPct: meanDailyPct(withChats.map((s) => s.atLeastOneAgentPct)),
   };
 }
 
 /**
- * Section 3 email: By Conversation metrics — today from report date; MTD = month-to-date with missing days omitted.
+ * Section 3 email: By Conversation — today from report date; MTD sums/means per product rules (see initiatorRowMtd / consumerBotCoverageMtd).
  * Pass `todayData` when the caller already loaded the daily blob to avoid a duplicate fetch.
  */
 export async function buildByConversationEmailPayload(
@@ -163,29 +186,31 @@ export async function buildByConversationEmailPayload(
     dailyAgentRows.push(initiatorRow(ai));
   }
 
+  const emptyConsumer: ConsumerBotCoverageSlice = {
+    totalChats: 0,
+    botCoverageCount: 0,
+    botCoveragePct: 0,
+    fullyBotCount: 0,
+    fullyBotPct: 0,
+    atLeastOneAgentCount: 0,
+    atLeastOneAgentPct: 0,
+  };
+
   const consumerMtd: ConsumerBotCoverageSlice =
-    dailyConsumerSlices.length > 0
-      ? averageConsumerBotCoverageMtd(dailyConsumerSlices)
-      : {
-          totalChats: 0,
-          botCoverageCount: 0,
-          botCoveragePct: 0,
-          fullyBotCount: 0,
-          fullyBotPct: 0,
-          atLeastOneAgentCount: 0,
-          atLeastOneAgentPct: 0,
-        };
+    dailyConsumerSlices.length > 0 ? consumerBotCoverageMtd(dailyConsumerSlices) : emptyConsumer;
+
+  const clientWithChats = dailyClientRows.filter((d) => d.totalChats > 0).length;
+  const agentWithChats = dailyAgentRows.filter((d) => d.totalChats > 0).length;
 
   return {
-    /** Days in MTD window with saved chat analysis (used for footnotes). */
     mtdDaysWithChatData: dailyConsumerSlices.length,
+    mtdClientInitiatorDaysWithChats: clientWithChats,
+    mtdAgentInitiatorDaysWithChats: agentWithChats,
     consumerBotCoverageToday: consumerSlice(todayView.consumerInitiated),
     consumerBotCoverageMtd: consumerMtd,
     clientInitiatedToday: initiatorRow(todayView.consumerInitiated),
-    clientInitiatedMtd:
-      dailyClientRows.length > 0 ? averageInitiatorRowsMtd(dailyClientRows) : emptyInitiatorRow(),
+    clientInitiatedMtd: dailyClientRows.length > 0 ? initiatorRowMtd(dailyClientRows) : emptyInitiatorRow(),
     agentInitiatedToday: initiatorRow(todayView.agentInitiated),
-    agentInitiatedMtd:
-      dailyAgentRows.length > 0 ? averageInitiatorRowsMtd(dailyAgentRows) : emptyInitiatorRow(),
+    agentInitiatedMtd: dailyAgentRows.length > 0 ? initiatorRowMtd(dailyAgentRows) : emptyInitiatorRow(),
   };
 }

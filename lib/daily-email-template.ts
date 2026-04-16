@@ -202,7 +202,7 @@ function renderBotCoverageByConversationTable(report: DailyEmailReportData): str
   const m = b.consumerBotCoverageMtd;
   const mtdNote =
     b.mtdDaysWithChatData > 0
-      ? `MTD values are daily averages: each metric uses only days where that metric has a value (missing/null omitted). Zero counts for that metric. Up to ${b.mtdDaysWithChatData} day(s) in this month had saved chat data.`
+      ? `MTD — Total chats and sub-counts are month-to-date sums on days with client-initiated total chats > 0 (${b.mtdClientInitiatorDaysWithChats} day(s)). Bot coverage, fully bot, and agent-message percentages are unweighted daily averages on those same days. Days with saved chat analysis in range: ${b.mtdDaysWithChatData}.`
       : 'No MTD data.';
 
   return `
@@ -272,8 +272,18 @@ function renderInitiatorComparisonTable(report: DailyEmailReportData): string {
         </tr>`;
   }
 
+  const initiatorMtdNote =
+    b.mtdDaysWithChatData > 0
+      ? `MTD — Per row: total chats and frustration/confusion counts are sums on days with total chats > 0 (client: ${b.mtdClientInitiatorDaysWithChats} day(s), agent: ${b.mtdAgentInitiatorDaysWithChats}). Rate columns are daily % averages on those days. Agent score and avg agent response average only days where each value is present. Saved analysis days: ${b.mtdDaysWithChatData}.`
+      : '';
+
   return `
     <div style="margin:0 0 8px 0;font-size:14px;font-weight:bold;color:#2c3e50;font-family:${font}">By initiator (By Conversation)</div>
+    ${
+      initiatorMtdNote
+        ? `<div style="font-size:10px;color:#757575;margin:0 0 8px 0;line-height:1.4;font-family:${font}">${escapeHtml(initiatorMtdNote)}</div>`
+        : ''
+    }
     <table role="presentation" width="100%" style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:1080px;margin:0 0 24px 0;mso-table-lspace:0pt;mso-table-rspace:0pt;" cellspacing="0" cellpadding="0">
       <thead>
         <tr>
@@ -362,7 +372,7 @@ export function renderDailyEmailText(report: DailyEmailReportData): string {
     '',
     '3. Chat Analysis (By Conversation)',
     `  Overall frustration (people): ${formatPercent(report.chatAnalysis.overallFrustrationPercent)} | confusion: ${formatPercent(report.chatAnalysis.overallConfusionPercent)}`,
-    `  Bot coverage table — client-initiated only. MTD days counted: ${report.byConversationEmail.mtdDaysWithChatData}`,
+    `  Bot coverage — MTD: ${report.byConversationEmail.mtdClientInitiatorDaysWithChats} day(s) with client chats; ${report.byConversationEmail.mtdDaysWithChatData} day(s) with saved analysis.`,
     `  See HTML for Bot Coverage and Client vs Agent initiator tables.`,
     '',
     '4. Trend charts (same year)',
