@@ -1,12 +1,24 @@
 import { enrichChatAnalysisData } from '@/lib/chat-analysis-enrich';
+import { eligibleDailyMean } from '@/lib/email-eligible-daily-mean';
 import { createEmptyByConversationViewData } from '@/lib/chat-by-conversation-metrics';
 import { getDailyChatAnalysisData } from '@/lib/chat-storage';
 import { mtdDateRange } from '@/lib/email-report-periods';
 import type { ChatAnalysisData, ConversationSectionMetrics } from '@/lib/chat-types';
 
-function pct(part: number, whole: number): number {
-  if (whole <= 0) return 0;
-  return Math.round((part / whole) * 10000) / 100;
+function emptyInitiatorRow(): InitiatorTableRow {
+  return {
+    totalChats: 0,
+    frustratedByBotCount: 0,
+    frustratedByBotPct: 0,
+    frustratedByAgentCount: 0,
+    frustratedByAgentPct: 0,
+    confusedByBotCount: 0,
+    confusedByBotPct: 0,
+    confusedByAgentCount: 0,
+    confusedByAgentPct: 0,
+    agentScoreAvg: null,
+    averageAgentResponseTimeSeconds: null,
+  };
 }
 
 /** Same as GET /api/chat-analysis: enrich blob then read `byConversationView` (never stale MTD vs dashboard). */
@@ -78,43 +90,40 @@ function initiatorRow(s: ConversationSectionMetrics): InitiatorTableRow {
   };
 }
 
-function poolInitiatorSections(sections: ConversationSectionMetrics[]): InitiatorTableRow {
-  let tot = 0;
-  let frB = 0;
-  let frA = 0;
-  let coB = 0;
-  let coA = 0;
-  const scoreAvgs: number[] = [];
-  const responseTimeAvgs: number[] = [];
+function eligibleNullableMean(values: (number | null | undefined)[]): number | null {
+  const nums = values.filter(
+    (x): x is number => x != null && typeof x === 'number' && !Number.isNaN(x) && x !== 0
+  );
+  if (nums.length === 0) return null;
+  return Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 1000) / 1000;
+}
 
-  for (const s of sections) {
-    tot += s.totalChats;
-    frB += s.frustrationByBotOrSystemCount;
-    frA += s.frustrationByAgentCount;
-    coB += s.confusionByBotOrSystemCount;
-    coA += s.confusionByAgentCount;
-    if (s.agentScoreAvg != null && !Number.isNaN(s.agentScoreAvg)) {
-      scoreAvgs.push(s.agentScoreAvg);
-    }
-    if (s.averageAgentResponseTimeSeconds != null && !Number.isNaN(s.averageAgentResponseTimeSeconds)) {
-      responseTimeAvgs.push(s.averageAgentResponseTimeSeconds);
-    }
-  }
-
+/** MTD = mean of daily values; each field drops null/undefined and zero days for that metric. */
+function averageInitiatorRowsMtd(dailies: InitiatorTableRow[]): InitiatorTableRow {
   return {
-    totalChats: tot,
-    frustratedByBotCount: frB,
-    frustratedByBotPct: pct(frB, tot),
-    frustratedByAgentCount: frA,
-    frustratedByAgentPct: pct(frA, tot),
-    confusedByBotCount: coB,
-    confusedByBotPct: pct(coB, tot),
-    confusedByAgentCount: coA,
-    confusedByAgentPct: pct(coA, tot),
-    agentScoreAvg: scoreAvgs.length ? scoreAvgs.reduce((a, b) => a + b, 0) / scoreAvgs.length : null,
-    averageAgentResponseTimeSeconds: responseTimeAvgs.length
-      ? responseTimeAvgs.reduce((a, b) => a + b, 0) / responseTimeAvgs.length
-      : null,
+    totalChats: eligibleDailyMean(dailies.map((d) => d.totalChats)),
+    frustratedByBotCount: eligibleDailyMean(dailies.map((d) => d.frustratedByBotCount)),
+    frustratedByBotPct: eligibleDailyMean(dailies.map((d) => d.frustratedByBotPct)),
+    frustratedByAgentCount: eligibleDailyMean(dailies.map((d) => d.frustratedByAgentCount)),
+    frustratedByAgentPct: eligibleDailyMean(dailies.map((d) => d.frustratedByAgentPct)),
+    confusedByBotCount: eligibleDailyMean(dailies.map((d) => d.confusedByBotCount)),
+    confusedByBotPct: eligibleDailyMean(dailies.map((d) => d.confusedByBotPct)),
+    confusedByAgentCount: eligibleDailyMean(dailies.map((d) => d.confusedByAgentCount)),
+    confusedByAgentPct: eligibleDailyMean(dailies.map((d) => d.confusedByAgentPct)),
+    agentScoreAvg: eligibleNullableMean(dailies.map((d) => d.agentScoreAvg)),
+    averageAgentResponseTimeSeconds: eligibleNullableMean(dailies.map((d) => d.averageAgentResponseTimeSeconds)),
+  };
+}
+
+function averageConsumerBotCoverageMtd(slices: ConsumerBotCoverageSlice[]): ConsumerBotCoverageSlice {
+  return {
+    totalChats: eligibleDailyMean(slices.map((s) => s.totalChats)),
+    botCoverageCount: eligibleDailyMean(slices.map((s) => s.botCoverageCount)),
+    botCoveragePct: eligibleDailyMean(slices.map((s) => s.botCoveragePct)),
+    fullyBotCount: eligibleDailyMean(slices.map((s) => s.fullyBotCount)),
+    fullyBotPct: eligibleDailyMean(slices.map((s) => s.fullyBotPct)),
+    atLeastOneAgentCount: eligibleDailyMean(slices.map((s) => s.atLeastOneAgentCount)),
+    atLeastOneAgentPct: eligibleDailyMean(slices.map((s) => s.atLeastOneAgentPct)),
   };
 }
 
@@ -136,9 +145,9 @@ export async function buildByConversationEmailPayload(
   const mtdDates = mtdDateRange(reportDate);
   const dailyData = await Promise.all(mtdDates.map((d) => getDailyChatAnalysisData(d)));
 
-  const consumerSections: ConversationSectionMetrics[] = [];
-  const clientSections: ConversationSectionMetrics[] = [];
-  const agentSections: ConversationSectionMetrics[] = [];
+  const dailyConsumerSlices: ConsumerBotCoverageSlice[] = [];
+  const dailyClientRows: InitiatorTableRow[] = [];
+  const dailyAgentRows: InitiatorTableRow[] = [];
 
   for (let i = 0; i < mtdDates.length; i++) {
     const data = dailyData[i];
@@ -147,47 +156,34 @@ export async function buildByConversationEmailPayload(
     if (!v) continue;
     const ci = v.consumerInitiated;
     const ai = v.agentInitiated;
-    /** MTD: skip missing blobs and days where a section has zero chats (excluded from sums and daily averages). */
-    if (ci.totalChats > 0) {
-      consumerSections.push(ci);
-      clientSections.push(ci);
-    }
-    if (ai.totalChats > 0) {
-      agentSections.push(ai);
-    }
+    dailyConsumerSlices.push(consumerSlice(ci));
+    dailyClientRows.push(initiatorRow(ci));
+    dailyAgentRows.push(initiatorRow(ai));
   }
 
-  const tot = consumerSections.reduce((s, c) => s + c.totalChats, 0);
-  const cov = consumerSections.reduce((s, c) => s + c.chatbotCoverageCount, 0);
-  const full = consumerSections.reduce((s, c) => s + c.fullyBotCount, 0);
-  const agCt = consumerSections.reduce((s, c) => s + c.atLeastOneAgentMessageCount, 0);
-
-  const dailyCovPcts = consumerSections.filter((c) => c.totalChats > 0).map((c) => c.chatbotCoveragePct);
-  const mtdCoveragePctAvg =
-    dailyCovPcts.length > 0
-      ? Math.round((dailyCovPcts.reduce((a, b) => a + b, 0) / dailyCovPcts.length) * 10) / 10
-      : tot > 0
-        ? pct(cov, tot)
-        : 0;
-
-  const consumerMtd: ConsumerBotCoverageSlice = {
-    totalChats: tot,
-    botCoverageCount: cov,
-    botCoveragePct: mtdCoveragePctAvg,
-    fullyBotCount: full,
-    fullyBotPct: tot > 0 ? pct(full, tot) : 0,
-    atLeastOneAgentCount: agCt,
-    atLeastOneAgentPct: tot > 0 ? pct(agCt, tot) : 0,
-  };
+  const consumerMtd: ConsumerBotCoverageSlice =
+    dailyConsumerSlices.length > 0
+      ? averageConsumerBotCoverageMtd(dailyConsumerSlices)
+      : {
+          totalChats: 0,
+          botCoverageCount: 0,
+          botCoveragePct: 0,
+          fullyBotCount: 0,
+          fullyBotPct: 0,
+          atLeastOneAgentCount: 0,
+          atLeastOneAgentPct: 0,
+        };
 
   return {
-    /** Days in MTD with ≥1 client-initiated chat (used for Bot Coverage pooled MTD). */
-    mtdDaysWithChatData: consumerSections.length,
+    /** Days in MTD window with saved chat analysis (used for footnotes). */
+    mtdDaysWithChatData: dailyConsumerSlices.length,
     consumerBotCoverageToday: consumerSlice(todayView.consumerInitiated),
     consumerBotCoverageMtd: consumerMtd,
     clientInitiatedToday: initiatorRow(todayView.consumerInitiated),
-    clientInitiatedMtd: poolInitiatorSections(clientSections),
+    clientInitiatedMtd:
+      dailyClientRows.length > 0 ? averageInitiatorRowsMtd(dailyClientRows) : emptyInitiatorRow(),
     agentInitiatedToday: initiatorRow(todayView.agentInitiated),
-    agentInitiatedMtd: poolInitiatorSections(agentSections),
+    agentInitiatedMtd:
+      dailyAgentRows.length > 0 ? averageInitiatorRowsMtd(dailyAgentRows) : emptyInitiatorRow(),
   };
 }

@@ -1,3 +1,4 @@
+import { eligibleDailyMean } from '@/lib/email-eligible-daily-mean';
 import {
   buildServiceOverviewRows,
   formatServiceConversionRate,
@@ -146,9 +147,19 @@ function sumByLabel(snapshots: ServiceOverviewRow[][]): Map<string, Sums> {
   return map;
 }
 
-function fmtAvg(n: number, days: number): number {
-  if (days <= 0) return 0;
-  return Math.round((n / days) * 10) / 10;
+/** One value per snapshot day (omit days where the row is missing — no push). */
+function dailyValuesForLabel(
+  snapshots: ServiceOverviewRow[][],
+  label: string,
+  pick: (r: ServiceOverviewRow) => number
+): number[] {
+  const out: number[] = [];
+  for (const snap of snapshots) {
+    const row = snap.find((r) => r.label === label);
+    if (!row) continue;
+    out.push(pick(row));
+  }
+  return out;
 }
 
 export interface EmailRowPeriodStats {
@@ -179,20 +190,36 @@ export function applyPeriodAggregatesToRows(
     const salesMtdCc = m.scc;
     const salesMtdMv = m.smv;
 
-    const prospectMtdAvgCc = fmtAvg(prospectMtdCc, mtdN);
-    const prospectMtdAvgMv = fmtAvg(prospectMtdMv, mtdN);
-    const salesMtdAvgCc = fmtAvg(salesMtdCc, mtdN);
-    const salesMtdAvgMv = fmtAvg(salesMtdMv, mtdN);
+    const prospectMtdAvgCc = eligibleDailyMean(
+      dailyValuesForLabel(mtdSnapshots, row.label, (r) => r.prospectCc)
+    );
+    const prospectMtdAvgMv = eligibleDailyMean(
+      dailyValuesForLabel(mtdSnapshots, row.label, (r) => r.prospectMv)
+    );
+    const salesMtdAvgCc = eligibleDailyMean(
+      dailyValuesForLabel(mtdSnapshots, row.label, (r) => r.salesCc)
+    );
+    const salesMtdAvgMv = eligibleDailyMean(
+      dailyValuesForLabel(mtdSnapshots, row.label, (r) => r.salesMv)
+    );
 
     const conversionRateMtd = formatServiceConversionRate(
       prospectMtdCc + prospectMtdMv,
       salesMtdCc + salesMtdMv
     );
 
-    const lmProspectDailyAvgCc = fmtAvg(l.pcc, lmN);
-    const lmProspectDailyAvgMv = fmtAvg(l.pmv, lmN);
-    const lmSalesDailyAvgCc = fmtAvg(l.scc, lmN);
-    const lmSalesDailyAvgMv = fmtAvg(l.smv, lmN);
+    const lmProspectDailyAvgCc = eligibleDailyMean(
+      dailyValuesForLabel(lmSnapshots, row.label, (r) => r.prospectCc)
+    );
+    const lmProspectDailyAvgMv = eligibleDailyMean(
+      dailyValuesForLabel(lmSnapshots, row.label, (r) => r.prospectMv)
+    );
+    const lmSalesDailyAvgCc = eligibleDailyMean(
+      dailyValuesForLabel(lmSnapshots, row.label, (r) => r.salesCc)
+    );
+    const lmSalesDailyAvgMv = eligibleDailyMean(
+      dailyValuesForLabel(lmSnapshots, row.label, (r) => r.salesMv)
+    );
     const lmConversionRate = formatServiceConversionRate(l.pcc + l.pmv, l.scc + l.smv);
 
     return {
@@ -220,7 +247,7 @@ export function applyPeriodAggregatesToRows(
 /** Totals row with same shape as detail rows (sums + derived averages). */
 export function computeExtendedTotalsRow(
   rows: ServiceOverviewRow[],
-  mtdDaysCounted: number,
+  mtdSnapshots: ServiceOverviewRow[][],
   lmSnapshots: ServiceOverviewRow[][]
 ): ServiceOverviewRow {
   let prospectCc = 0;
@@ -243,11 +270,23 @@ export function computeExtendedTotalsRow(
     salesMtdMv += r.salesMtdMv;
   }
 
-  const mtdN = mtdDaysCounted;
-  const prospectMtdAvgCc = fmtAvg(prospectMtdCc, mtdN);
-  const prospectMtdAvgMv = fmtAvg(prospectMtdMv, mtdN);
-  const salesMtdAvgCc = fmtAvg(salesMtdCc, mtdN);
-  const salesMtdAvgMv = fmtAvg(salesMtdMv, mtdN);
+  const dailyGrandPcc = mtdSnapshots.map((snap) =>
+    snap.reduce((s, r) => s + r.prospectCc, 0)
+  );
+  const dailyGrandPmv = mtdSnapshots.map((snap) =>
+    snap.reduce((s, r) => s + r.prospectMv, 0)
+  );
+  const dailyGrandScc = mtdSnapshots.map((snap) =>
+    snap.reduce((s, r) => s + r.salesCc, 0)
+  );
+  const dailyGrandSmv = mtdSnapshots.map((snap) =>
+    snap.reduce((s, r) => s + r.salesMv, 0)
+  );
+
+  const prospectMtdAvgCc = eligibleDailyMean(dailyGrandPcc);
+  const prospectMtdAvgMv = eligibleDailyMean(dailyGrandPmv);
+  const salesMtdAvgCc = eligibleDailyMean(dailyGrandScc);
+  const salesMtdAvgMv = eligibleDailyMean(dailyGrandSmv);
 
   const pt = prospectCc + prospectMv;
   const st = salesCc + salesMv;
@@ -256,10 +295,10 @@ export function computeExtendedTotalsRow(
 
   let lmProsSum = 0;
   let lmSalSum = 0;
-  let sumLmDayPcc = 0;
-  let sumLmDayPmv = 0;
-  let sumLmDayScc = 0;
-  let sumLmDaySmv = 0;
+  const lmDailyPcc: number[] = [];
+  const lmDailyPmv: number[] = [];
+  const lmDailyScc: number[] = [];
+  const lmDailySmv: number[] = [];
   if (lmSnapshots.length > 0) {
     for (const snap of lmSnapshots) {
       let dayPcc = 0;
@@ -272,19 +311,18 @@ export function computeExtendedTotalsRow(
         dayScc += r.salesCc;
         daySmv += r.salesMv;
       }
-      sumLmDayPcc += dayPcc;
-      sumLmDayPmv += dayPmv;
-      sumLmDayScc += dayScc;
-      sumLmDaySmv += daySmv;
+      lmDailyPcc.push(dayPcc);
+      lmDailyPmv.push(dayPmv);
+      lmDailyScc.push(dayScc);
+      lmDailySmv.push(daySmv);
       lmProsSum += dayPcc + dayPmv;
       lmSalSum += dayScc + daySmv;
     }
   }
-  const lmN = lmSnapshots.length;
-  const lmProspectDailyAvgCc = fmtAvg(sumLmDayPcc, lmN);
-  const lmProspectDailyAvgMv = fmtAvg(sumLmDayPmv, lmN);
-  const lmSalesDailyAvgCc = fmtAvg(sumLmDayScc, lmN);
-  const lmSalesDailyAvgMv = fmtAvg(sumLmDaySmv, lmN);
+  const lmProspectDailyAvgCc = eligibleDailyMean(lmDailyPcc);
+  const lmProspectDailyAvgMv = eligibleDailyMean(lmDailyPmv);
+  const lmSalesDailyAvgCc = eligibleDailyMean(lmDailyScc);
+  const lmSalesDailyAvgMv = eligibleDailyMean(lmDailySmv);
   const lmConversionRate = formatServiceConversionRate(lmProsSum, lmSalSum);
 
   return {

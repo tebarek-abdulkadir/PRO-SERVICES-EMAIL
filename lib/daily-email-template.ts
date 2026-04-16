@@ -68,7 +68,11 @@ function serviceDataCells(row: ServiceOverviewRow, bold = false): string {
           <td style="${s}">${escapeHtml(row.lmConversionRate)}</td>`;
 }
 
-function renderServiceOverviewTable(rows: ServiceOverviewRow[], totals: ServiceOverviewRow): string {
+function renderServiceOverviewTable(
+  rows: ServiceOverviewRow[],
+  totals: ServiceOverviewRow,
+  periodNote?: { mtdDaysCounted: number; lmDaysCounted: number }
+): string {
   const bodyRows = rows
     .map((row, i) => {
       const bg = i % 2 === 0 ? '#fff' : '#f9fafb';
@@ -129,7 +133,12 @@ function renderServiceOverviewTable(rows: ServiceOverviewRow[], totals: ServiceO
           ${serviceDataCells(totals, true)}
         </tr>
       </tbody>
-    </table>`;
+    </table>
+    ${
+      periodNote
+        ? `<div style="font-size:10px;color:#757575;margin:8px 0 0 0;line-height:1.35;">MTD Daily Avg and LM daily averages: for each cell, only days where that metric is non-null and non-zero are averaged (up to ${periodNote.mtdDaysCounted} MTD day(s) and ${periodNote.lmDaysCounted} LM day(s) with saved prospect data).</div>`
+        : ''
+    }`;
 }
 
 function renderCsatReplyRateTable(): string {
@@ -193,7 +202,7 @@ function renderBotCoverageByConversationTable(report: DailyEmailReportData): str
   const m = b.consumerBotCoverageMtd;
   const mtdNote =
     b.mtdDaysWithChatData > 0
-      ? `MTD sums/averages use ${b.mtdDaysWithChatData} day(s) in this month with saved chat data; calendar days without data are omitted.`
+      ? `MTD values are daily averages over ${b.mtdDaysWithChatData} day(s) in this month with saved chat data (days without blobs omitted). For each metric, days where that value is null or zero are excluded from that metric average.`
       : 'No MTD data.';
 
   return `
@@ -393,7 +402,10 @@ export function renderDailyEmailHtml(
             <td style="padding:24px 24px 32px 24px;width:100%;min-width:100%;">
               <!-- keep full table visible in clients that clip narrow layouts -->
               ${sectionTitle('1', 'Service Overview')}
-              ${renderServiceOverviewTable(report.prospects.rows, totals)}
+              ${renderServiceOverviewTable(report.prospects.rows, totals, {
+                mtdDaysCounted: report.prospects.mtdDaysCounted,
+                lmDaysCounted: report.prospects.lmDaysCounted,
+              })}
               ${sectionTitle('2', 'CSAT & Reply Rate')}
               ${renderCsatReplyRateTable()}
               ${sectionTitle('3', 'Chat Analysis')}

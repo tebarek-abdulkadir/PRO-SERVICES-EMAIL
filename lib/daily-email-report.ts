@@ -182,7 +182,7 @@ async function getProspectsAndSalesBlock(
     mtdSnapshots,
     lmSnapshots
   );
-  const totalsRow = computeExtendedTotalsRow(periodRows, mtdDaysCounted, lmSnapshots);
+  const totalsRow = computeExtendedTotalsRow(periodRows, mtdSnapshots, lmSnapshots);
 
   return {
     columnLabelShort,
