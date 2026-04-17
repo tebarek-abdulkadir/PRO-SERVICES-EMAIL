@@ -14,10 +14,9 @@ import {
   emailChatTrendDateRange,
   emailTrendDateRange,
   lastMonthDateRange,
+  loadServiceOverviewSnapshots,
   mtdDateRange,
-  tryLoadServiceOverviewForDate,
 } from '@/lib/email-report-periods';
-import { pauseForEmailBlobThrottle } from '@/lib/email-blob-throttle';
 import { loadEmailTrendSeries } from '@/lib/email-trend-data';
 import {
   renderChatRatesTrendSvg,
@@ -138,21 +137,6 @@ function formatDisplayDate(date: string, timeZone: string): string {
   }).format(new Date(`${date}T12:00:00Z`));
 }
 
-/** Same as loadServiceOverviewSnapshots but pauses between days to respect Blob rate limits. */
-async function loadServiceOverviewSnapshotsForEmail(
-  dates: string[]
-): Promise<ServiceOverviewRow[][]> {
-  const out: ServiceOverviewRow[][] = [];
-  for (const date of dates) {
-    const rows = await tryLoadServiceOverviewForDate(date);
-    if (rows !== null && rows.length > 0) {
-      out.push(rows);
-    }
-    await pauseForEmailBlobThrottle();
-  }
-  return out;
-}
-
 async function loadDatePayload(date: string): Promise<DatePayload> {
   const d = await getDashboardProspectsData(date);
   return {
@@ -189,8 +173,10 @@ async function getProspectsAndSalesBlock(
 
   const mtdDates = mtdDateRange(date);
   const lmDates = lastMonthDateRange(date);
-  const mtdSnapshots = await loadServiceOverviewSnapshotsForEmail(mtdDates);
-  const lmSnapshots = await loadServiceOverviewSnapshotsForEmail(lmDates);
+  const [mtdSnapshots, lmSnapshots] = await Promise.all([
+    loadServiceOverviewSnapshots(mtdDates),
+    loadServiceOverviewSnapshots(lmDates),
+  ]);
   const { rows: periodRows, mtdDaysCounted, lmDaysCounted } = applyPeriodAggregatesToRows(
     rows,
     mtdSnapshots,
@@ -222,15 +208,12 @@ async function getAverageResponseTime(date: string): Promise<string | null> {
 export async function getDailyEmailReportData(date: string): Promise<DailyEmailReportData> {
   const conversionDates = emailTrendDateRange(date);
   const chatTrendDates = emailChatTrendDateRange(date);
-  /** Sequential Blob-heavy steps — avoid Promise.all bursting Vercel Blob limits. */
-  const block = await getProspectsAndSalesBlock(date);
-  await pauseForEmailBlobThrottle();
-  const chatData = await getDailyChatAnalysisData(date);
-  await pauseForEmailBlobThrottle();
-  const averageResponseTime = await getAverageResponseTime(date);
-  await pauseForEmailBlobThrottle();
-  const trendSeries = await loadEmailTrendSeries(conversionDates, chatTrendDates);
-  await pauseForEmailBlobThrottle();
+  const [block, chatData, averageResponseTime, trendSeries] = await Promise.all([
+    getProspectsAndSalesBlock(date),
+    getDailyChatAnalysisData(date),
+    getAverageResponseTime(date),
+    loadEmailTrendSeries(conversionDates, chatTrendDates),
+  ]);
 
   if (!chatData) {
     throw new Error(`No chat analysis data available for ${date}`);

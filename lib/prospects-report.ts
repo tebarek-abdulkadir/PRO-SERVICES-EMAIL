@@ -2,7 +2,6 @@ import { getAllComplaintsBeforeDate, filterProspectsWithoutPreviousComplaints } 
 import { EMAIL_TRAVEL_REGIONS, resolveEmailTravelRegionKey } from '@/lib/email-travel-regions';
 import { getServiceKeyFromComplaintType } from '@/lib/pnl-complaints-types';
 import type { ByContractType, Conversions, Prospects } from '@/lib/types';
-import { pauseBetweenComplaintBlobFetches } from '@/lib/email-blob-throttle';
 import { getDailyData, getLatestRun, getProspectDetailsByDate, getProspectsGroupedByHousehold } from '@/lib/unified-storage';
 
 const TRAVEL_COMPLAINT_SERVICE_KEYS = new Set([
@@ -76,11 +75,9 @@ async function getComplaintsForDate(date: string): Promise<ComplaintRecord[]> {
       return [];
     }
 
-    const allComplaintsResults = [];
-    for (const complaintDate of datesResult.dates) {
-      allComplaintsResults.push(await getDailyComplaints(complaintDate));
-      await pauseBetweenComplaintBlobFetches();
-    }
+    const allComplaintsResults = await Promise.all(
+      datesResult.dates.map((complaintDate) => getDailyComplaints(complaintDate))
+    );
 
     return allComplaintsResults
       .filter((result) => result.success && result.data)

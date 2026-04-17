@@ -1,5 +1,4 @@
 import { enrichChatAnalysisData } from '@/lib/chat-analysis-enrich';
-import { pauseForEmailBlobThrottle } from '@/lib/email-blob-throttle';
 import { getDailyChatAnalysisData } from '@/lib/chat-storage';
 import { SERVICE_OVERVIEW_PRODUCT_LABELS, type ServiceOverviewRow } from '@/lib/email-report-layout';
 import { tryLoadServiceOverviewForDate } from '@/lib/email-report-periods';
@@ -77,14 +76,12 @@ export async function loadEmailTrendSeries(
         conversionRatePctByLabel.get(lb)!.push(r !== undefined ? rowConversionRatePercent(r) : null);
       }
     }
-    await pauseForEmailBlobThrottle();
   }
 
   const chatBreakdown = emptyChatBreakdownArrays();
 
   for (const d of chatTrendDates) {
     const chat = await getDailyChatAnalysisData(d);
-    await pauseForEmailBlobThrottle();
     const v = viewFromData(chat);
     if (!v) {
       chatBreakdown.frustrationClientByAgent.push(null);
