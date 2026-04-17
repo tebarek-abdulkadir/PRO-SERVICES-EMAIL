@@ -11,19 +11,10 @@ import {
 import {
   applyPeriodAggregatesToRows,
   computeExtendedTotalsRow,
-  emailChatTrendDateRange,
-  emailTrendDateRange,
   lastMonthDateRange,
   loadServiceOverviewSnapshots,
   mtdDateRange,
 } from '@/lib/email-report-periods';
-import { loadEmailTrendSeries } from '@/lib/email-trend-data';
-import {
-  renderChatRatesTrendSvg,
-  renderConversionTrendSvg,
-  type ChatRatesTrendSeries,
-} from '@/lib/email-trend-charts';
-import { trySvgToPngBuffer } from '@/lib/svg-to-png';
 import type { EmailSalesCcMvSplit, EnrichedProspectDetail } from '@/lib/prospects-report';
 import { getDashboardProspectsData } from '@/lib/prospects-report';
 import type { ByContractType, Prospects } from '@/lib/types';
@@ -78,45 +69,11 @@ export interface DailyEmailReportData {
   };
   /** By Conversation tab metrics — section 3 tables */
   byConversationEmail: ByConversationEmailPayload;
-  /** Daily trends: conversion from Apr 6; chat breakdown from Apr 13 (same calendar year as report). */
-  trendCharts: {
-    rangeLabel: string;
-    dayCount: number;
-    chatTrendRangeLabel: string;
-    chatTrendDayCount: number;
-    /** PNG bytes: attach with `cid:` for real email; use data URL in dry-run HTML preview */
-    conversionPng: Buffer | null;
-    chatRatesPng: Buffer | null;
-  };
 }
 
-/** Safe for `JSON.stringify` (strips binary). */
+/** Safe for `JSON.stringify`. */
 export function serializeDailyEmailReportForJson(report: DailyEmailReportData): Record<string, unknown> {
-  return {
-    ...report,
-    trendCharts: {
-      rangeLabel: report.trendCharts.rangeLabel,
-      dayCount: report.trendCharts.dayCount,
-      chatTrendRangeLabel: report.trendCharts.chatTrendRangeLabel,
-      chatTrendDayCount: report.trendCharts.chatTrendDayCount,
-      conversionPngBytes: report.trendCharts.conversionPng?.length ?? 0,
-      chatRatesPngBytes: report.trendCharts.chatRatesPng?.length ?? 0,
-    },
-  };
-}
-
-function formatTrendRangeLabel(reportDate: string): string {
-  const y = reportDate.slice(0, 4);
-  const end = new Date(`${reportDate}T12:00:00Z`);
-  const endStr = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(end);
-  return `Apr 6 – ${endStr}, ${y}`;
-}
-
-function formatChatTrendRangeLabel(reportDate: string): string {
-  const y = reportDate.slice(0, 4);
-  const end = new Date(`${reportDate}T12:00:00Z`);
-  const endStr = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(end);
-  return `Apr 13 – ${endStr}, ${y}`;
+  return { ...report };
 }
 
 function parseBooleanParam(value: string | null): boolean {
@@ -206,13 +163,10 @@ async function getAverageResponseTime(date: string): Promise<string | null> {
 }
 
 export async function getDailyEmailReportData(date: string): Promise<DailyEmailReportData> {
-  const conversionDates = emailTrendDateRange(date);
-  const chatTrendDates = emailChatTrendDateRange(date);
-  const [block, chatData, averageResponseTime, trendSeries] = await Promise.all([
+  const [block, chatData, averageResponseTime] = await Promise.all([
     getProspectsAndSalesBlock(date),
     getDailyChatAnalysisData(date),
     getAverageResponseTime(date),
-    loadEmailTrendSeries(conversionDates, chatTrendDates),
   ]);
 
   if (!chatData) {
@@ -222,45 +176,6 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
   const byConversationEmail = await buildByConversationEmailPayload(date, chatData);
 
   const m = chatData.overallMetrics;
-
-  const rangeLabel = formatTrendRangeLabel(date);
-  const chatTrendRangeLabel = formatChatTrendRangeLabel(date);
-  const conversionSeries = trendSeries.labels.map((label) => ({
-    label,
-    values: trendSeries.conversionRatePctByLabel.get(label) ?? [],
-  }));
-  const conversionSvg = renderConversionTrendSvg(
-    conversionDates,
-    conversionSeries,
-    `Daily conversion rate by product (${rangeLabel})`
-  );
-  const b = trendSeries.chatBreakdown;
-  const chatBreakdownSeries: ChatRatesTrendSeries[] = [
-    { label: 'Fr. client init. · agent', values: b.frustrationClientByAgent, color: '#c0392b' },
-    { label: 'Fr. client init. · bot/sys', values: b.frustrationClientByBot, color: '#e59866' },
-    { label: 'Fr. agent init. · agent', values: b.frustrationAgentInitByAgent, color: '#922b21' },
-    { label: 'Fr. agent init. · bot/sys', values: b.frustrationAgentInitByBot, color: '#f5b7b1' },
-    { label: 'Cf. client init. · agent', values: b.confusionClientByAgent, color: '#1f618d' },
-    { label: 'Cf. client init. · bot/sys', values: b.confusionClientByBot, color: '#5dade2' },
-    { label: 'Cf. agent init. · agent', values: b.confusionAgentInitByAgent, color: '#154360' },
-    { label: 'Cf. agent init. · bot/sys', values: b.confusionAgentInitByBot, color: '#aed6f1' },
-  ];
-  const chatRatesSvg = renderChatRatesTrendSvg(
-    chatTrendDates,
-    chatBreakdownSeries,
-    `Frustration & confusion — by initiator & channel (${chatTrendRangeLabel})`
-  );
-
-  const convPng = trySvgToPngBuffer(conversionSvg);
-  const chatPng = trySvgToPngBuffer(chatRatesSvg);
-  const conversionPng = 'buffer' in convPng ? convPng.buffer : null;
-  const chatRatesPng = 'buffer' in chatPng ? chatPng.buffer : null;
-  if (!conversionPng) {
-    console.error('[Daily Email] Conversion chart PNG failed:', 'error' in convPng ? convPng.error : '');
-  }
-  if (!chatRatesPng) {
-    console.error('[Daily Email] Chat rates chart PNG failed:', 'error' in chatPng ? chatPng.error : '');
-  }
 
   return {
     date,
@@ -276,14 +191,6 @@ export async function getDailyEmailReportData(date: string): Promise<DailyEmailR
       overallConfusionPercent: m.confusionPercentage || 0,
     },
     byConversationEmail,
-    trendCharts: {
-      rangeLabel,
-      dayCount: conversionDates.length,
-      chatTrendRangeLabel,
-      chatTrendDayCount: chatTrendDates.length,
-      conversionPng,
-      chatRatesPng,
-    },
   };
 }
 

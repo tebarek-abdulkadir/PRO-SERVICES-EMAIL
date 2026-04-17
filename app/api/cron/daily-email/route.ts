@@ -6,7 +6,6 @@ import {
   resolveReportDate,
   serializeDailyEmailReportForJson,
 } from '@/lib/daily-email-report';
-import { EMAIL_TREND_CHAT_RATES_CID, EMAIL_TREND_CONVERSION_CID } from '@/lib/email-trend-cids';
 import {
   buildDailyEmailSubject,
   renderDailyEmailHtml,
@@ -77,8 +76,8 @@ export async function GET(request: NextRequest) {
     const report = await getDailyEmailReportData(date);
     const subject = buildDailyEmailSubject(report);
     const text = renderDailyEmailText(report);
-    const htmlDryRun = renderDailyEmailHtml(report, 'dataUrl');
-    const htmlForSend = renderDailyEmailHtml(report, 'cid');
+    const htmlDryRun = renderDailyEmailHtml(report);
+    const htmlForSend = renderDailyEmailHtml(report);
 
     if (dryRun) {
       return NextResponse.json({
@@ -112,28 +111,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const inlineAttachments = [];
-    if (report.trendCharts.conversionPng?.length) {
-      inlineAttachments.push({
-        filename: 'trend-conversions.png',
-        content: report.trendCharts.conversionPng,
-        cid: EMAIL_TREND_CONVERSION_CID,
-      });
-    }
-    if (report.trendCharts.chatRatesPng?.length) {
-      inlineAttachments.push({
-        filename: 'trend-chat-rates.png',
-        content: report.trendCharts.chatRatesPng,
-        cid: EMAIL_TREND_CHAT_RATES_CID,
-      });
-    }
-
     const delivery = await sendSmtpEmail({
       to: recipientsOverride || undefined,
       subject,
       html: htmlForSend,
       text,
-      inlineAttachments: inlineAttachments.length > 0 ? inlineAttachments : undefined,
     });
 
     return NextResponse.json({
