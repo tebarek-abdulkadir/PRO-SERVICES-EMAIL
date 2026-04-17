@@ -1,27 +1,14 @@
+import {
+  getAgentsDailyAverageDelaySecondsForDate,
+  withAgentsDelayResponseTimeOnMtd,
+} from '@/lib/agent-delay-mtd';
 import { enrichChatAnalysisData } from '@/lib/chat-analysis-enrich';
 import { createEmptyByConversationViewData } from '@/lib/chat-by-conversation-metrics';
 import { getByConversationMtdSnapshot } from '@/lib/chat-by-conversation-mtd-storage';
 import { getDailyChatAnalysisData } from '@/lib/chat-storage';
-import { mtdDateRange } from '@/lib/email-report-periods';
 import type { ChatAnalysisData, ConversationSectionMetrics } from '@/lib/chat-types';
 
-function emptyInitiatorRow(): InitiatorTableRow {
-  return {
-    totalChats: 0,
-    frustratedByBotCount: 0,
-    frustratedByBotPct: 0,
-    frustratedByAgentCount: 0,
-    frustratedByAgentPct: 0,
-    confusedByBotCount: 0,
-    confusedByBotPct: 0,
-    confusedByAgentCount: 0,
-    confusedByAgentPct: 0,
-    agentScoreAvg: null,
-    averageAgentResponseTimeSeconds: null,
-  };
-}
-
-/** Same as GET /api/chat-analysis: enrich blob then read `byConversationView` (never stale MTD vs dashboard). */
+/** Same as GET /api/chat-analysis: enrich blob then read `byConversationView` (never stale vs dashboard). */
 function viewFromData(data: ChatAnalysisData | null) {
   if (!data) return null;
   const enriched = enrichChatAnalysisData(data);
@@ -95,67 +82,10 @@ function initiatorRow(s: ConversationSectionMetrics): InitiatorTableRow {
   };
 }
 
-/** Mean of nullable metrics per day; only null/NaN omit a day (independent of total-chat days). */
-function eligibleNullableMean(values: (number | null | undefined)[]): number | null {
-  const nums = values.filter(
-    (x): x is number => x != null && typeof x === 'number' && !Number.isNaN(x)
-  );
-  if (nums.length === 0) return null;
-  return Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 1000) / 1000;
-}
-
-function meanDailyPct(values: number[]): number {
-  if (values.length === 0) return 0;
-  return Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 1000) / 1000;
-}
-
 /**
- * By-initiator MTD (client or agent row):
- * - Total chats & count columns: sum over days where that row's totalChats &gt; 0.
- * - Percent columns: unweighted mean of daily % on those same days.
- * - Agent score & avg response: mean over days where the value is non-null only (separate day set).
- */
-function initiatorRowMtd(dailies: InitiatorTableRow[]): InitiatorTableRow {
-  const withChats = dailies.filter((d) => d.totalChats > 0);
-  const sum = (pick: (d: InitiatorTableRow) => number) =>
-    withChats.reduce((acc, d) => acc + pick(d), 0);
-  return {
-    totalChats: sum((d) => d.totalChats),
-    frustratedByBotCount: sum((d) => d.frustratedByBotCount),
-    frustratedByBotPct: meanDailyPct(withChats.map((d) => d.frustratedByBotPct)),
-    frustratedByAgentCount: sum((d) => d.frustratedByAgentCount),
-    frustratedByAgentPct: meanDailyPct(withChats.map((d) => d.frustratedByAgentPct)),
-    confusedByBotCount: sum((d) => d.confusedByBotCount),
-    confusedByBotPct: meanDailyPct(withChats.map((d) => d.confusedByBotPct)),
-    confusedByAgentCount: sum((d) => d.confusedByAgentCount),
-    confusedByAgentPct: meanDailyPct(withChats.map((d) => d.confusedByAgentPct)),
-    agentScoreAvg: eligibleNullableMean(dailies.map((d) => d.agentScoreAvg)),
-    averageAgentResponseTimeSeconds: eligibleNullableMean(dailies.map((d) => d.averageAgentResponseTimeSeconds)),
-  };
-}
-
-/**
- * Bot coverage (consumer-initiated) MTD: same calendar days for totals, counts, and % —
- * only days where consumer totalChats &gt; 0. Total chats and counts are sums; percentages are daily means on those days.
- */
-function consumerBotCoverageMtd(slices: ConsumerBotCoverageSlice[]): ConsumerBotCoverageSlice {
-  const withChats = slices.filter((s) => s.totalChats > 0);
-  const sum = (pick: (s: ConsumerBotCoverageSlice) => number) =>
-    withChats.reduce((acc, s) => acc + pick(s), 0);
-  return {
-    totalChats: sum((s) => s.totalChats),
-    botCoverageCount: sum((s) => s.botCoverageCount),
-    botCoveragePct: meanDailyPct(withChats.map((s) => s.botCoveragePct)),
-    fullyBotCount: sum((s) => s.fullyBotCount),
-    fullyBotPct: meanDailyPct(withChats.map((s) => s.fullyBotPct)),
-    atLeastOneAgentCount: sum((s) => s.atLeastOneAgentCount),
-    atLeastOneAgentPct: meanDailyPct(withChats.map((s) => s.atLeastOneAgentPct)),
-  };
-}
-
-/**
- * Section 3 email: By Conversation — today from report date; MTD sums/means per product rules (see initiatorRowMtd / consumerBotCoverageMtd).
- * Pass `todayData` when the caller already loaded the daily blob to avoid a duplicate fetch.
+ * Section 3 email: By Conversation — today from daily chat blob; MTD from stored By Conversation snapshot
+ * (same as Chats → By Conversation → MTD). Avg agent response (today + MTD) uses Agent Performance delay-time
+ * data, not chat-ingest response times.
  */
 export async function buildByConversationEmailPayload(
   reportDate: string,
@@ -168,66 +98,30 @@ export async function buildByConversationEmailPayload(
 
   const todayView = viewFromData(resolvedToday) ?? createEmptyByConversationViewData();
 
-  const snap = await getByConversationMtdSnapshot(reportDate);
-  if (snap?.mtd) {
-    return {
-      mtdDaysWithChatData: snap.mtd.mtdDaysWithChatData,
-      mtdClientInitiatorDaysWithChats: snap.mtd.mtdClientInitiatorDaysWithChats,
-      mtdAgentInitiatorDaysWithChats: snap.mtd.mtdAgentInitiatorDaysWithChats,
-      consumerBotCoverageToday: consumerSlice(todayView.consumerInitiated),
-      consumerBotCoverageMtd: snap.mtd.consumerBotCoverageMtd,
-      clientInitiatedToday: initiatorRow(todayView.consumerInitiated),
-      clientInitiatedMtd: snap.mtd.clientInitiatedMtd,
-      agentInitiatedToday: initiatorRow(todayView.agentInitiated),
-      agentInitiatedMtd: snap.mtd.agentInitiatedMtd,
-    };
+  const rawSnap = await getByConversationMtdSnapshot(reportDate);
+  if (!rawSnap?.mtd) {
+    throw new Error(
+      `No By Conversation MTD snapshot for ${reportDate}. Save chat analysis for that day (or POST /api/chat-analysis/by-conversation-mtd) so MTD can be built.`
+    );
   }
 
-  // Fallback: compute MTD by scanning daily blobs (may hit Blob rate limits).
-  const mtdDates = mtdDateRange(reportDate);
-  const dailyData = await Promise.all(mtdDates.map((d) => getDailyChatAnalysisData(d)));
+  const snap = await withAgentsDelayResponseTimeOnMtd(rawSnap, reportDate);
+  const mtd = snap.mtd;
 
-  const dailyConsumerSlices: ConsumerBotCoverageSlice[] = [];
-  const dailyClientRows: InitiatorTableRow[] = [];
-  const dailyAgentRows: InitiatorTableRow[] = [];
+  const rtToday = await getAgentsDailyAverageDelaySecondsForDate(reportDate);
 
-  for (let i = 0; i < mtdDates.length; i++) {
-    const data = dailyData[i];
-    if (!data) continue;
-    const v = viewFromData(data);
-    if (!v) continue;
-    const ci = v.consumerInitiated;
-    const ai = v.agentInitiated;
-    dailyConsumerSlices.push(consumerSlice(ci));
-    dailyClientRows.push(initiatorRow(ci));
-    dailyAgentRows.push(initiatorRow(ai));
-  }
-
-  const emptyConsumer: ConsumerBotCoverageSlice = {
-    totalChats: 0,
-    botCoverageCount: 0,
-    botCoveragePct: 0,
-    fullyBotCount: 0,
-    fullyBotPct: 0,
-    atLeastOneAgentCount: 0,
-    atLeastOneAgentPct: 0,
-  };
-
-  const consumerMtd: ConsumerBotCoverageSlice =
-    dailyConsumerSlices.length > 0 ? consumerBotCoverageMtd(dailyConsumerSlices) : emptyConsumer;
-
-  const clientWithChats = dailyClientRows.filter((d) => d.totalChats > 0).length;
-  const agentWithChats = dailyAgentRows.filter((d) => d.totalChats > 0).length;
+  const clientToday = { ...initiatorRow(todayView.consumerInitiated), averageAgentResponseTimeSeconds: rtToday };
+  const agentToday = { ...initiatorRow(todayView.agentInitiated), averageAgentResponseTimeSeconds: rtToday };
 
   return {
-    mtdDaysWithChatData: dailyConsumerSlices.length,
-    mtdClientInitiatorDaysWithChats: clientWithChats,
-    mtdAgentInitiatorDaysWithChats: agentWithChats,
+    mtdDaysWithChatData: mtd.mtdDaysWithChatData,
+    mtdClientInitiatorDaysWithChats: mtd.mtdClientInitiatorDaysWithChats,
+    mtdAgentInitiatorDaysWithChats: mtd.mtdAgentInitiatorDaysWithChats,
     consumerBotCoverageToday: consumerSlice(todayView.consumerInitiated),
-    consumerBotCoverageMtd: consumerMtd,
-    clientInitiatedToday: initiatorRow(todayView.consumerInitiated),
-    clientInitiatedMtd: dailyClientRows.length > 0 ? initiatorRowMtd(dailyClientRows) : emptyInitiatorRow(),
-    agentInitiatedToday: initiatorRow(todayView.agentInitiated),
-    agentInitiatedMtd: dailyAgentRows.length > 0 ? initiatorRowMtd(dailyAgentRows) : emptyInitiatorRow(),
+    consumerBotCoverageMtd: mtd.consumerBotCoverageMtd,
+    clientInitiatedToday: clientToday,
+    clientInitiatedMtd: mtd.clientInitiatedMtd,
+    agentInitiatedToday: agentToday,
+    agentInitiatedMtd: mtd.agentInitiatedMtd,
   };
 }

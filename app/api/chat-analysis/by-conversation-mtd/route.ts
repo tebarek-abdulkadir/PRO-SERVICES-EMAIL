@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
+import { withAgentsDelayResponseTimeOnMtd } from '@/lib/agent-delay-mtd';
 import { enrichChatAnalysisData } from '@/lib/chat-analysis-enrich';
 import { createEmptyByConversationViewData } from '@/lib/chat-by-conversation-metrics';
 import { getDailyChatAnalysisData } from '@/lib/chat-storage';
 import { getByConversationMtdSnapshot, saveByConversationMtdSnapshot } from '@/lib/chat-by-conversation-mtd-storage';
+import type { ByConversationMtdSnapshot } from '@/lib/chat-by-conversation-mtd';
 import {
   buildNextByConversationMtdSnapshot,
   consumerSliceFromMetrics,
@@ -45,7 +47,8 @@ export async function GET(request: Request) {
   if (!isValidDate(date)) {
     return NextResponse.json({ success: false, error: 'date must be YYYY-MM-DD' }, { status: 400 });
   }
-  const snap = await getByConversationMtdSnapshot(date);
+  const raw = await getByConversationMtdSnapshot(date);
+  const snap = raw ? await withAgentsDelayResponseTimeOnMtd(raw, date) : null;
   return NextResponse.json({ success: true, snapshot: snap });
 }
 
@@ -63,7 +66,8 @@ export async function POST(request: Request) {
   if (isValidDate(date)) {
     const r = await buildForDate(date);
     if ('error' in r) return NextResponse.json({ success: false, error: r.error }, { status: r.status });
-    return NextResponse.json({ success: true, snapshot: r.snapshot });
+    const snapshot = await withAgentsDelayResponseTimeOnMtd(r.snapshot as ByConversationMtdSnapshot, date);
+    return NextResponse.json({ success: true, snapshot });
   }
 
   if (!isValidDate(startDate) || !isValidDate(endDate) || startDate > endDate) {
@@ -79,7 +83,7 @@ export async function POST(request: Request) {
     if ('error' in r) {
       return NextResponse.json({ success: false, error: r.error, failedDate: cur }, { status: r.status });
     }
-    snapshots.push(r.snapshot);
+    snapshots.push(await withAgentsDelayResponseTimeOnMtd(r.snapshot as ByConversationMtdSnapshot, cur));
     // next day
     const [y, m, d] = cur.split('-').map(Number);
     const utc = new Date(Date.UTC(y, m - 1, d));

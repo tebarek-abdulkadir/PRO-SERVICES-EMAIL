@@ -121,6 +121,41 @@ function ConversationInitiatorBlock({
         <div className="hidden md:block" aria-hidden />
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl p-6 border-2 border-slate-200 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-auto">
+            <HelpCircle className="w-6 h-6 text-blue-600" />
+            <span className="text-xl font-bold text-blue-600">{m.confusionPct}%</span>
+          </div>
+          <div className="mt-auto">
+            <div className="text-3xl font-bold text-slate-900 mb-1">{m.confusionCount}</div>
+            <div className="text-sm font-medium text-slate-600">Confusion</div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl p-6 border-2 border-slate-200 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-auto">
+            <Headphones className="w-6 h-6 text-sky-700" />
+            <span className="text-xl font-bold text-sky-700">{m.confusionByAgentPct}%</span>
+          </div>
+          <div className="mt-auto">
+            <div className="text-3xl font-bold text-slate-900 mb-1">{m.confusionByAgentCount}</div>
+            <div className="text-sm font-medium text-slate-600">Confusion caused by Agent</div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl p-6 border-2 border-slate-200 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-auto">
+            <Bot className="w-6 h-6 text-indigo-600" />
+            <span className="text-xl font-bold text-indigo-700">{m.confusionByBotOrSystemPct}%</span>
+          </div>
+          <div className="mt-auto">
+            <div className="text-3xl font-bold text-slate-900 mb-1">{m.confusionByBotOrSystemCount}</div>
+            <div className="text-sm font-medium text-slate-600">Confusion caused by Bot / System</div>
+          </div>
+        </div>
+      </div>
+
       {showChatbot && (
         <div className="space-y-3 pt-2">
           <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">

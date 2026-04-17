@@ -202,7 +202,7 @@ function renderBotCoverageByConversationTable(report: DailyEmailReportData): str
   const m = b.consumerBotCoverageMtd;
   const mtdNote =
     b.mtdDaysWithChatData > 0
-      ? `MTD — Total chats and sub-counts are month-to-date sums on days with client-initiated total chats > 0 (${b.mtdClientInitiatorDaysWithChats} day(s)). Bot coverage, fully bot, and agent-message percentages are unweighted daily averages on those same days. Days with saved chat analysis in range: ${b.mtdDaysWithChatData}.`
+      ? `MTD — Same values as Chats → By Conversation → MTD (stored snapshot). Total chats and sub-counts are month-to-date sums on days with client-initiated total chats > 0 (${b.mtdClientInitiatorDaysWithChats} day(s)). Bot coverage, fully bot, and agent-message percentages are unweighted daily averages on those same days. Days with saved chat analysis in range: ${b.mtdDaysWithChatData}.`
       : 'No MTD data.';
 
   return `
@@ -274,7 +274,7 @@ function renderInitiatorComparisonTable(report: DailyEmailReportData): string {
 
   const initiatorMtdNote =
     b.mtdDaysWithChatData > 0
-      ? `MTD — Per row: total chats and frustration/confusion counts are sums on days with total chats > 0 (client: ${b.mtdClientInitiatorDaysWithChats} day(s), agent: ${b.mtdAgentInitiatorDaysWithChats}). Rate columns are daily % averages on those days. Agent score and avg agent response average only days where each value is present. Saved analysis days: ${b.mtdDaysWithChatData}.`
+      ? `MTD — Same frustration/confusion totals and rates as Chats → By Conversation → MTD snapshot. Per row: total chats and frustration/confusion counts are sums on days with total chats > 0 (client: ${b.mtdClientInitiatorDaysWithChats} day(s), agent: ${b.mtdAgentInitiatorDaysWithChats}). Rate columns are daily % averages on those days. Agent score MTD averages only days where present. Avg Agent Response (today and MTD) matches Agent Performance → Daily Avg Response Time, not chat-ingest times. Saved analysis days: ${b.mtdDaysWithChatData}.`
       : '';
 
   return `
