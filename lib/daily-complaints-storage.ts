@@ -230,11 +230,9 @@ export async function aggregateDailyComplaints(
       };
     }
 
-    /** Sequential fetches avoid Vercel Blob rate limits from concurrent list() calls. */
-    const dailyResults: Awaited<ReturnType<typeof getDailyComplaints>>[] = [];
-    for (const date of datesToFetch) {
-      dailyResults.push(await getDailyComplaints(date));
-    }
+    // Fetch all daily data
+    const dailyDataPromises = datesToFetch.map(date => getDailyComplaints(date));
+    const dailyResults = await Promise.all(dailyDataPromises);
 
     // Combine all complaints
     const allComplaints: PnLComplaint[] = [];

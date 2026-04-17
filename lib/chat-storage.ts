@@ -22,27 +22,6 @@ import {
 const CHAT_BLOB_PREFIX = 'chat-analysis';
 const DELAY_BLOB_PREFIX = 'delay-time';
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/** Vercel Blob throws when concurrency or burst limits are exceeded. */
-function isBlobRateLimitError(error: unknown): boolean {
-  if (error == null) return false;
-  const msg = error instanceof Error ? error.message : String(error);
-  if (/too many requests|rate limit/i.test(msg)) return true;
-  const o = error as { status?: number; code?: number };
-  return o.status === 429 || o.code === 429;
-}
-
-function retryDelayMsForBlob(error: unknown, attemptIndex: number): number {
-  if (typeof error === 'object' && error !== null && 'retryAfter' in error) {
-    const sec = Number((error as { retryAfter?: unknown }).retryAfter);
-    if (Number.isFinite(sec) && sec > 0) return Math.min(120_000, sec * 1000);
-  }
-  return Math.min(45_000, 800 * 2 ** attemptIndex);
-}
-
 /**
  * Save daily chat analysis data to blob storage
  */
@@ -114,50 +93,34 @@ export async function getLatestChatAnalysisData(): Promise<ChatAnalysisData | nu
 }
 
 /**
- * Get daily chat analysis data for a specific date.
- * Retries on Vercel Blob rate limits (burst/concurrent list+fetch can 429).
+ * Get daily chat analysis data for a specific date
  */
 export async function getDailyChatAnalysisData(date: string): Promise<ChatAnalysisData | null> {
-  const maxAttempts = 5;
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    try {
-      const { blobs } = await list({
-        prefix: `chat-analysis/daily/${date}.json`,
-      });
-
-      if (blobs.length === 0) {
-        console.log(`[Chat Storage] No data found for date: ${date}`);
-        return null;
-      }
-
-      const response = await fetch(blobs[0].url);
-
-      if (response.status === 429) {
-        throw Object.assign(new Error('Too many requests (fetch)'), { status: 429, retryAfter: 60 });
-      }
-
-      if (!response.ok) {
-        console.error(`[Chat Storage] Failed to fetch data for ${date}:`, response.status);
-        return null;
-      }
-
-      const data = await response.json();
-      return data as ChatAnalysisData;
-    } catch (error) {
-      const retriable = isBlobRateLimitError(error) && attempt < maxAttempts - 1;
-      if (retriable) {
-        const wait = retryDelayMsForBlob(error, attempt);
-        console.warn(
-          `[Chat Storage] Blob rate limit for ${date}, waiting ${wait}ms before retry ${attempt + 2}/${maxAttempts}`
-        );
-        await delay(wait);
-        continue;
-      }
-      console.error(`[Chat Storage] Error fetching chat analysis data for ${date}:`, error);
+  try {
+    // List blobs to find the exact URL
+    const { blobs } = await list({
+      prefix: `chat-analysis/daily/${date}.json`,
+    });
+    
+    if (blobs.length === 0) {
+      console.log(`[Chat Storage] No data found for date: ${date}`);
       return null;
     }
+    
+    // Fetch from the blob URL
+    const response = await fetch(blobs[0].url);
+    
+    if (!response.ok) {
+      console.error(`[Chat Storage] Failed to fetch data for ${date}:`, response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    return data as ChatAnalysisData;
+  } catch (error) {
+    console.error(`[Chat Storage] Error fetching chat analysis data for ${date}:`, error);
+    return null;
   }
-  return null;
 }
 
 /**

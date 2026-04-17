@@ -168,11 +168,7 @@ export async function buildByConversationEmailPayload(
   const todayView = viewFromData(resolvedToday) ?? createEmptyByConversationViewData();
 
   const mtdDates = mtdDateRange(reportDate);
-  /** Sequential loads avoid Vercel Blob "Too many concurrent requests" when MTD spans many days. */
-  const dailyData: (ChatAnalysisData | null)[] = [];
-  for (const d of mtdDates) {
-    dailyData.push(await getDailyChatAnalysisData(d));
-  }
+  const dailyData = await Promise.all(mtdDates.map((d) => getDailyChatAnalysisData(d)));
 
   const dailyConsumerSlices: ConsumerBotCoverageSlice[] = [];
   const dailyClientRows: InitiatorTableRow[] = [];
