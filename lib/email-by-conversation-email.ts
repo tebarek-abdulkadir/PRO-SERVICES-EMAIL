@@ -1,6 +1,6 @@
 import {
-  getAgentsDailyAverageDelaySecondsForDate,
-  withAgentsDelayResponseTimeOnMtd,
+  applyAgentsMtdDelaySecondsToSnapshot,
+  getAgentsMtdAverageAndTodaySeconds,
 } from '@/lib/agent-delay-mtd';
 import { enrichChatAnalysisData } from '@/lib/chat-analysis-enrich';
 import { createEmptyByConversationViewData } from '@/lib/chat-by-conversation-metrics';
@@ -82,10 +82,39 @@ function initiatorRow(s: ConversationSectionMetrics): InitiatorTableRow {
   };
 }
 
+function emptyConsumerMtd(): ConsumerBotCoverageSlice {
+  return {
+    totalChats: 0,
+    botCoverageCount: 0,
+    botCoveragePct: 0,
+    fullyBotCount: 0,
+    fullyBotPct: 0,
+    atLeastOneAgentCount: 0,
+    atLeastOneAgentPct: 0,
+  };
+}
+
+function emptyInitiatorMtd(): InitiatorTableRow {
+  return {
+    totalChats: 0,
+    frustratedByBotCount: 0,
+    frustratedByBotPct: 0,
+    frustratedByAgentCount: 0,
+    frustratedByAgentPct: 0,
+    confusedByBotCount: 0,
+    confusedByBotPct: 0,
+    confusedByAgentCount: 0,
+    confusedByAgentPct: 0,
+    agentScoreAvg: null,
+    averageAgentResponseTimeSeconds: null,
+  };
+}
+
 /**
  * Section 3 email: By Conversation — today from daily chat blob; MTD from stored By Conversation snapshot
- * (same as Chats → By Conversation → MTD). Avg agent response (today + MTD) uses Agent Performance delay-time
- * data, not chat-ingest response times.
+ * when present (same as Chats → By Conversation → MTD). Avg agent response uses Agent Performance delay-time
+ * data (sequential Blob reads to avoid rate limits). If the snapshot is missing, MTD chat totals are zero but
+ * the email still sends; delay columns still use delay-time when available.
  */
 export async function buildByConversationEmailPayload(
   reportDate: string,
@@ -98,20 +127,38 @@ export async function buildByConversationEmailPayload(
 
   const todayView = viewFromData(resolvedToday) ?? createEmptyByConversationViewData();
 
+  const delay = await getAgentsMtdAverageAndTodaySeconds(reportDate);
   const rawSnap = await getByConversationMtdSnapshot(reportDate);
+
+  const clientToday = {
+    ...initiatorRow(todayView.consumerInitiated),
+    averageAgentResponseTimeSeconds: delay.todaySeconds,
+  };
+  const agentToday = {
+    ...initiatorRow(todayView.agentInitiated),
+    averageAgentResponseTimeSeconds: delay.todaySeconds,
+  };
+
   if (!rawSnap?.mtd) {
-    throw new Error(
-      `No By Conversation MTD snapshot for ${reportDate}. Save chat analysis for that day (or POST /api/chat-analysis/by-conversation-mtd) so MTD can be built.`
+    console.warn(
+      `[Email] No By Conversation MTD snapshot for ${reportDate}; MTD chat metrics default to zero. Build snapshot via ingest or POST /api/chat-analysis/by-conversation-mtd.`
     );
+    const mtdRt = delay.mtdAverage;
+    return {
+      mtdDaysWithChatData: 0,
+      mtdClientInitiatorDaysWithChats: 0,
+      mtdAgentInitiatorDaysWithChats: 0,
+      consumerBotCoverageToday: consumerSlice(todayView.consumerInitiated),
+      consumerBotCoverageMtd: emptyConsumerMtd(),
+      clientInitiatedToday: clientToday,
+      clientInitiatedMtd: { ...emptyInitiatorMtd(), averageAgentResponseTimeSeconds: mtdRt },
+      agentInitiatedToday: agentToday,
+      agentInitiatedMtd: { ...emptyInitiatorMtd(), averageAgentResponseTimeSeconds: mtdRt },
+    };
   }
 
-  const snap = await withAgentsDelayResponseTimeOnMtd(rawSnap, reportDate);
+  const snap = applyAgentsMtdDelaySecondsToSnapshot(rawSnap, delay.mtdAverage);
   const mtd = snap.mtd;
-
-  const rtToday = await getAgentsDailyAverageDelaySecondsForDate(reportDate);
-
-  const clientToday = { ...initiatorRow(todayView.consumerInitiated), averageAgentResponseTimeSeconds: rtToday };
-  const agentToday = { ...initiatorRow(todayView.agentInitiated), averageAgentResponseTimeSeconds: rtToday };
 
   return {
     mtdDaysWithChatData: mtd.mtdDaysWithChatData,
