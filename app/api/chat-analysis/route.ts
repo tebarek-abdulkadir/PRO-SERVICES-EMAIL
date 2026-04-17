@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { saveDailyChatAnalysisData, aggregateDailyChatAnalysisResults, getLatestChatAnalysisData, getDailyChatAnalysisData } from '@/lib/chat-storage';
 import { computeByChatsViewMetrics } from '@/lib/chat-by-chats-metrics';
 import { computeByConversationViewFromResults } from '@/lib/chat-by-conversation-metrics';
+import { getByConversationMtdSnapshot, saveByConversationMtdSnapshot } from '@/lib/chat-by-conversation-mtd-storage';
+import { buildNextByConversationMtdSnapshot, consumerSliceFromMetrics, initiatorRowFromMetrics } from '@/lib/chat-by-conversation-mtd';
 import {
   buildJoinedSkillsLookupMap,
   mergeJoinedSkillsFields,
@@ -318,6 +320,30 @@ export async function POST(request: Request): Promise<NextResponse<ChatAnalysisR
 
     // Save to blob storage
     await saveDailyChatAnalysisData(toSave);
+
+    // Update stored By Conversation MTD snapshot for this analysisDate (incremental, avoids month scan).
+    try {
+      const [y, m, d] = analysisDate.split('-').map(Number);
+      const utc = new Date(Date.UTC(y, m - 1, d));
+      utc.setUTCDate(utc.getUTCDate() - 1);
+      const prevDate = utc.toISOString().slice(0, 10);
+      const prev = await getByConversationMtdSnapshot(prevDate);
+      const enriched = enrichChatAnalysisData(toSave);
+      const byConv = enriched.byConversationView ?? toSave.byConversationView;
+      if (byConv) {
+        const snap = buildNextByConversationMtdSnapshot({
+          date: analysisDate,
+          prev,
+          consumerDaily: consumerSliceFromMetrics(byConv.consumerInitiated),
+          clientDaily: initiatorRowFromMetrics(byConv.consumerInitiated),
+          agentDaily: initiatorRowFromMetrics(byConv.agentInitiated),
+          sourceLastUpdated: (toSave as any).lastUpdated,
+        });
+        await saveByConversationMtdSnapshot(snap);
+      }
+    } catch (e) {
+      console.error('[Chat Analysis API] Failed to update by-conversation MTD snapshot:', e);
+    }
 
     return NextResponse.json({
       success: true,

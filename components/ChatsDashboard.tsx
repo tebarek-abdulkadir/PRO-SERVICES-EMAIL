@@ -20,6 +20,8 @@ import type {
   ChatTrendData,
   ConversationSectionMetrics,
 } from '@/lib/chat-types';
+import type { ByConversationMtdSnapshot } from '@/lib/chat-by-conversation-mtd';
+import type { InitiatorTableRow } from '@/lib/email-by-conversation-email';
 import DatePickerCalendar from '@/components/DatePickerCalendar';
 import ChatTrendChart from '@/components/ChatTrendChart';
 
@@ -168,6 +170,10 @@ export default function ChatsDashboard() {
   const [trendData, setTrendData] = useState<ChatTrendData[]>([]);
   const [isLoadingTrends, setIsLoadingTrends] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('people');
+  const [byConversationTimeMode, setByConversationTimeMode] = useState<'daily' | 'mtd'>('daily');
+  const [mtdSnapshot, setMtdSnapshot] = useState<ByConversationMtdSnapshot | null>(null);
+  const [mtdLoading, setMtdLoading] = useState(false);
+  const [mtdError, setMtdError] = useState<string | null>(null);
 
   // Fetch available dates
   useEffect(() => {
@@ -220,6 +226,42 @@ export default function ChatsDashboard() {
 
     fetchData();
   }, [selectedDate]);
+
+  // Fetch stored MTD snapshot when needed
+  useEffect(() => {
+    let cancelled = false;
+    async function loadMtd() {
+      if (!selectedDate || viewMode !== 'conversation' || byConversationTimeMode !== 'mtd') {
+        setMtdSnapshot(null);
+        setMtdError(null);
+        setMtdLoading(false);
+        return;
+      }
+      try {
+        setMtdLoading(true);
+        setMtdError(null);
+        const res = await fetch(`/api/chat-analysis/by-conversation-mtd?date=${selectedDate}`);
+        const json = await res.json();
+        if (cancelled) return;
+        if (json.success) {
+          setMtdSnapshot(json.snapshot ?? null);
+        } else {
+          setMtdSnapshot(null);
+          setMtdError(json.error || 'Failed to load MTD snapshot');
+        }
+      } catch (e) {
+        if (cancelled) return;
+        setMtdSnapshot(null);
+        setMtdError('Failed to load MTD snapshot');
+      } finally {
+        if (!cancelled) setMtdLoading(false);
+      }
+    }
+    loadMtd();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDate, viewMode, byConversationTimeMode]);
 
   // Fetch trend data when date is selected
   useEffect(() => {
@@ -439,6 +481,35 @@ export default function ChatsDashboard() {
               </button>
             </div>
           </div>
+          {viewMode === 'conversation' && (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <span className="text-sm font-medium text-slate-600">Time:</span>
+              <div className="inline-flex rounded-lg border border-slate-300 bg-slate-100 p-0.5 shadow-sm" role="group">
+                <button
+                  type="button"
+                  onClick={() => setByConversationTimeMode('daily')}
+                  className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                    byConversationTimeMode === 'daily'
+                      ? 'bg-white text-slate-900 shadow'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Daily
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setByConversationTimeMode('mtd')}
+                  className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                    byConversationTimeMode === 'mtd'
+                      ? 'bg-white text-slate-900 shadow'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  MTD
+                </button>
+              </div>
+            </div>
+          )}
       </div>
 
         {/* Date Selector */}
@@ -496,30 +567,203 @@ export default function ChatsDashboard() {
       {/* Stats: By Conversation — initiator split (same card grid style as By People) */}
       {viewMode === 'conversation' && (
         <div className="space-y-10">
-          {byConv.excludedNoInitiator > 0 && (
-            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-              {byConv.excludedNoInitiator} conversation(s) excluded (missing or unknown{' '}
-              <code className="text-xs bg-amber-100 px-1 rounded">initiator</code>).
-            </p>
+          {byConversationTimeMode === 'mtd' && (
+            <div className="bg-white rounded-xl border-2 border-slate-200 shadow-sm p-5">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">By Conversation — MTD snapshot</div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    Stored once per day to avoid month-to-date scans during email generation.
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!selectedDate) return;
+                      try {
+                        setMtdLoading(true);
+                        setMtdError(null);
+                        const res = await fetch('/api/chat-analysis/by-conversation-mtd', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ date: selectedDate }),
+                        });
+                        const json = await res.json();
+                        if (json.success) {
+                          setMtdSnapshot(json.snapshot ?? null);
+                        } else {
+                          setMtdError(json.error || 'Failed to build MTD snapshot');
+                        }
+                      } catch {
+                        setMtdError('Failed to build MTD snapshot');
+                      } finally {
+                        setMtdLoading(false);
+                      }
+                    }}
+                    className="px-3 py-2 text-sm font-medium rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
+                    disabled={mtdLoading || !selectedDate}
+                  >
+                    Build / Refresh for date
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        setMtdLoading(true);
+                        setMtdError(null);
+                        const res = await fetch('/api/chat-analysis/by-conversation-mtd', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ startDate: '2026-04-12', endDate: '2026-04-16' }),
+                        });
+                        const json = await res.json();
+                        if (!json.success) {
+                          setMtdError(json.error || 'Backfill failed');
+                        } else if (selectedDate) {
+                          const r2 = await fetch(`/api/chat-analysis/by-conversation-mtd?date=${selectedDate}`);
+                          const j2 = await r2.json();
+                          setMtdSnapshot(j2.snapshot ?? null);
+                        }
+                      } catch {
+                        setMtdError('Backfill failed');
+                      } finally {
+                        setMtdLoading(false);
+                      }
+                    }}
+                    className="px-3 py-2 text-sm font-medium rounded-lg bg-slate-100 text-slate-800 border border-slate-300 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                    disabled={mtdLoading}
+                  >
+                    Backfill Apr 12–16
+                  </button>
+                </div>
+              </div>
+
+              {mtdLoading && <div className="text-sm text-slate-600 mt-3">Loading…</div>}
+              {mtdError && <div className="text-sm text-red-700 mt-3">{mtdError}</div>}
+
+              {mtdSnapshot?.mtd ? (
+                <div className="mt-4 space-y-6">
+                  <div className="text-xs text-slate-500">
+                    Days counted (client chats &gt; 0): {mtdSnapshot.mtd.mtdClientInitiatorDaysWithChats} | Days counted (agent chats &gt; 0):{' '}
+                    {mtdSnapshot.mtd.mtdAgentInitiatorDaysWithChats} | Saved days in range: {mtdSnapshot.mtd.mtdDaysWithChatData}
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="min-w-[900px] w-full border-collapse">
+                      <thead>
+                        <tr className="bg-slate-900 text-white text-xs">
+                          <th className="text-left px-3 py-2 border border-slate-700">Bot Coverage (Client Initiated)</th>
+                          <th className="px-3 py-2 border border-slate-700">Total Chats</th>
+                          <th className="px-3 py-2 border border-slate-700">Bot Coverage</th>
+                          <th className="px-3 py-2 border border-slate-700">Fully Bot</th>
+                          <th className="px-3 py-2 border border-slate-700">≥1 Agent Msg</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-sm">
+                        <tr className="bg-white">
+                          <td className="px-3 py-2 border border-slate-200 font-medium">MTD</td>
+                          <td className="px-3 py-2 border border-slate-200 text-center">{mtdSnapshot.mtd.consumerBotCoverageMtd.totalChats}</td>
+                          <td className="px-3 py-2 border border-slate-200 text-center">
+                            {mtdSnapshot.mtd.consumerBotCoverageMtd.botCoverageCount} ({mtdSnapshot.mtd.consumerBotCoverageMtd.botCoveragePct}%)
+                          </td>
+                          <td className="px-3 py-2 border border-slate-200 text-center">
+                            {mtdSnapshot.mtd.consumerBotCoverageMtd.fullyBotCount} ({mtdSnapshot.mtd.consumerBotCoverageMtd.fullyBotPct}%)
+                          </td>
+                          <td className="px-3 py-2 border border-slate-200 text-center">
+                            {mtdSnapshot.mtd.consumerBotCoverageMtd.atLeastOneAgentCount} ({mtdSnapshot.mtd.consumerBotCoverageMtd.atLeastOneAgentPct}%)
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="min-w-[1100px] w-full border-collapse">
+                      <thead>
+                        <tr className="bg-slate-900 text-white text-xs">
+                          <th className="text-left px-3 py-2 border border-slate-700">Initiator</th>
+                          <th className="px-3 py-2 border border-slate-700">Total Chats</th>
+                          <th className="px-3 py-2 border border-slate-700">Fr. by Bot</th>
+                          <th className="px-3 py-2 border border-slate-700">Fr. by Agent</th>
+                          <th className="px-3 py-2 border border-slate-700">Cf. by Bot</th>
+                          <th className="px-3 py-2 border border-slate-700">Cf. by Agent</th>
+                          <th className="px-3 py-2 border border-slate-700">Agent Score</th>
+                          <th className="px-3 py-2 border border-slate-700">Avg Agent RT</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-sm">
+                        {(
+                          [
+                            { label: 'Client Initiated', row: mtdSnapshot.mtd.clientInitiatedMtd },
+                            { label: 'Agent Initiated', row: mtdSnapshot.mtd.agentInitiatedMtd },
+                          ] as { label: string; row: InitiatorTableRow }[]
+                        ).map(({ label, row: r }) => (
+                          <tr key={label} className="bg-white">
+                            <td className="px-3 py-2 border border-slate-200 font-medium">{label}</td>
+                            <td className="px-3 py-2 border border-slate-200 text-center">{r.totalChats}</td>
+                            <td className="px-3 py-2 border border-slate-200 text-center">
+                              {r.frustratedByBotCount} ({r.frustratedByBotPct}%)
+                            </td>
+                            <td className="px-3 py-2 border border-slate-200 text-center">
+                              {r.frustratedByAgentCount} ({r.frustratedByAgentPct}%)
+                            </td>
+                            <td className="px-3 py-2 border border-slate-200 text-center">
+                              {r.confusedByBotCount} ({r.confusedByBotPct}%)
+                            </td>
+                            <td className="px-3 py-2 border border-slate-200 text-center">
+                              {r.confusedByAgentCount} ({r.confusedByAgentPct}%)
+                            </td>
+                            <td className="px-3 py-2 border border-slate-200 text-center">
+                              {r.agentScoreAvg == null ? '—' : Number(r.agentScoreAvg).toFixed(2)}
+                            </td>
+                            <td className="px-3 py-2 border border-slate-200 text-center">
+                              {r.averageAgentResponseTimeSeconds == null
+                                ? '—'
+                                : formatAverageAgentResponseTimeDisplay(r.averageAgentResponseTimeSeconds)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-slate-600 mt-3">
+                  No stored snapshot for this date yet. Use “Build / Refresh for date” (or backfill).
+                </div>
+              )}
+            </div>
           )}
 
-          <ConversationInitiatorBlock
-            title="Consumer Initiated"
-            subtitle="Initiator is Consumer or Bot (case-insensitive)."
-            m={byConv.consumerInitiated}
-            showChatbot
-            pct={pct}
-            formatAvg={formatAvg}
-          />
+          {byConversationTimeMode === 'daily' && (
+            <>
+              {byConv.excludedNoInitiator > 0 && (
+                <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
+                  {byConv.excludedNoInitiator} conversation(s) excluded (missing or unknown{' '}
+                  <code className="text-xs bg-amber-100 px-1 rounded">initiator</code>).
+                </p>
+              )}
 
-          <ConversationInitiatorBlock
-            title="Agent Initiated"
-            subtitle="Initiator is Agent (case-insensitive)."
-            m={byConv.agentInitiated}
-            showChatbot={false}
-            pct={pct}
-            formatAvg={formatAvg}
-          />
+              <ConversationInitiatorBlock
+                title="Consumer Initiated"
+                subtitle="Initiator is Consumer or Bot (case-insensitive)."
+                m={byConv.consumerInitiated}
+                showChatbot
+                pct={pct}
+                formatAvg={formatAvg}
+              />
+
+              <ConversationInitiatorBlock
+                title="Agent Initiated"
+                subtitle="Initiator is Agent (case-insensitive)."
+                m={byConv.agentInitiated}
+                showChatbot={false}
+                pct={pct}
+                formatAvg={formatAvg}
+              />
+            </>
+          )}
         </div>
       )}
 

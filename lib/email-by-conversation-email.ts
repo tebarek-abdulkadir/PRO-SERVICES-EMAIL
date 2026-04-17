@@ -1,5 +1,6 @@
 import { enrichChatAnalysisData } from '@/lib/chat-analysis-enrich';
 import { createEmptyByConversationViewData } from '@/lib/chat-by-conversation-metrics';
+import { getByConversationMtdSnapshot } from '@/lib/chat-by-conversation-mtd-storage';
 import { getDailyChatAnalysisData } from '@/lib/chat-storage';
 import { mtdDateRange } from '@/lib/email-report-periods';
 import type { ChatAnalysisData, ConversationSectionMetrics } from '@/lib/chat-types';
@@ -167,6 +168,22 @@ export async function buildByConversationEmailPayload(
 
   const todayView = viewFromData(resolvedToday) ?? createEmptyByConversationViewData();
 
+  const snap = await getByConversationMtdSnapshot(reportDate);
+  if (snap?.mtd) {
+    return {
+      mtdDaysWithChatData: snap.mtd.mtdDaysWithChatData,
+      mtdClientInitiatorDaysWithChats: snap.mtd.mtdClientInitiatorDaysWithChats,
+      mtdAgentInitiatorDaysWithChats: snap.mtd.mtdAgentInitiatorDaysWithChats,
+      consumerBotCoverageToday: consumerSlice(todayView.consumerInitiated),
+      consumerBotCoverageMtd: snap.mtd.consumerBotCoverageMtd,
+      clientInitiatedToday: initiatorRow(todayView.consumerInitiated),
+      clientInitiatedMtd: snap.mtd.clientInitiatedMtd,
+      agentInitiatedToday: initiatorRow(todayView.agentInitiated),
+      agentInitiatedMtd: snap.mtd.agentInitiatedMtd,
+    };
+  }
+
+  // Fallback: compute MTD by scanning daily blobs (may hit Blob rate limits).
   const mtdDates = mtdDateRange(reportDate);
   const dailyData = await Promise.all(mtdDates.map((d) => getDailyChatAnalysisData(d)));
 
