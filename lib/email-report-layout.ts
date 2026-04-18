@@ -45,6 +45,11 @@ export interface ServiceOverviewRow {
   lmProspectDailyAvgMv: number;
   lmSalesDailyAvgCc: number;
   lmSalesDailyAvgMv: number;
+  /** Last calendar month: absolute totals (sum over days with data) — used in email instead of LM daily averages. */
+  lmProspectTotalCc: number;
+  lmProspectTotalMv: number;
+  lmSalesTotalCc: number;
+  lmSalesTotalMv: number;
   lmConversionRate: string;
 }
 
@@ -120,6 +125,10 @@ function serviceOverviewRow(
     lmProspectDailyAvgMv: 0,
     lmSalesDailyAvgCc: 0,
     lmSalesDailyAvgMv: 0,
+    lmProspectTotalCc: 0,
+    lmProspectTotalMv: 0,
+    lmSalesTotalCc: 0,
+    lmSalesTotalMv: 0,
     lmConversionRate: '0%',
   };
 }

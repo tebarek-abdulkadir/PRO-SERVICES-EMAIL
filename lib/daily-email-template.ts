@@ -43,11 +43,6 @@ const CSAT_SERVICE_ROWS = [
   'Passport Ethiopian',
 ] as const;
 
-function fmtAvgCell(n: number): string {
-  if (n === 0) return '0';
-  return Number.isInteger(n) ? String(n) : n.toFixed(1);
-}
-
 const tdNum = (extra: string) => `padding:8px 10px;border:1px solid #bdc3c7;font-size:12px;color:#212121;font-family:${font};text-align:center;${extra}`;
 
 function serviceDataCells(row: ServiceOverviewRow, bold = false): string {
@@ -57,20 +52,16 @@ function serviceDataCells(row: ServiceOverviewRow, bold = false): string {
           <td style="${s}">${row.prospectMv}</td>
           <td style="${s}">${row.prospectMtdCc}</td>
           <td style="${s}">${row.prospectMtdMv}</td>
-          <td style="${s}">${fmtAvgCell(row.prospectMtdAvgCc)}</td>
-          <td style="${s}">${fmtAvgCell(row.prospectMtdAvgMv)}</td>
           <td style="${s}">${row.salesCc}</td>
           <td style="${s}">${row.salesMv}</td>
           <td style="${s}">${row.salesMtdCc}</td>
           <td style="${s}">${row.salesMtdMv}</td>
-          <td style="${s}">${fmtAvgCell(row.salesMtdAvgCc)}</td>
-          <td style="${s}">${fmtAvgCell(row.salesMtdAvgMv)}</td>
           <td style="${s}">${escapeHtml(row.conversionRate)}</td>
           <td style="${s}">${escapeHtml(row.conversionRateMtd)}</td>
-          <td style="${s}">${fmtAvgCell(row.lmProspectDailyAvgCc)}</td>
-          <td style="${s}">${fmtAvgCell(row.lmProspectDailyAvgMv)}</td>
-          <td style="${s}">${fmtAvgCell(row.lmSalesDailyAvgCc)}</td>
-          <td style="${s}">${fmtAvgCell(row.lmSalesDailyAvgMv)}</td>
+          <td style="${s}">${row.lmProspectTotalCc}</td>
+          <td style="${s}">${row.lmProspectTotalMv}</td>
+          <td style="${s}">${row.lmSalesTotalCc}</td>
+          <td style="${s}">${row.lmSalesTotalMv}</td>
           <td style="${s}">${escapeHtml(row.lmConversionRate)}</td>`;
 }
 
@@ -91,33 +82,27 @@ function renderServiceOverviewTable(
     .join('');
 
   return `
-    <table role="presentation" width="100%" style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:1100px;margin:0 0 24px 0;mso-table-lspace:0pt;mso-table-rspace:0pt;table-layout:auto;" cellspacing="0" cellpadding="0">
+    <table role="presentation" width="100%" style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:920px;margin:0 0 24px 0;mso-table-lspace:0pt;mso-table-rspace:0pt;table-layout:auto;" cellspacing="0" cellpadding="0">
       <thead>
         <tr>
           <th style="${thLeft}" rowspan="3">Service Type</th>
-          <th style="${thStyle}" colspan="6">Prospect</th>
-          <th style="${thStyle}" colspan="6">Sales</th>
+          <th style="${thStyle}" colspan="4">Prospect</th>
+          <th style="${thStyle}" colspan="4">Sales</th>
           <th style="${thStyle}" colspan="2">Conversion</th>
           <th style="${thStyle}" colspan="5">LM (last month)</th>
         </tr>
         <tr>
           <th style="${thStyle}" colspan="2">Daily</th>
           <th style="${thStyle}" colspan="2">MTD total</th>
-          <th style="${thStyle}" colspan="2">MTD Daily Avg</th>
           <th style="${thStyle}" colspan="2">Daily</th>
           <th style="${thStyle}" colspan="2">MTD total</th>
-          <th style="${thStyle}" colspan="2">MTD Daily Avg</th>
           <th style="${thStyle}" rowspan="2">Daily</th>
-          <th style="${thStyle}" rowspan="2">MTD Daily Avg</th>
-          <th style="${thStyle}" colspan="2">Prospect daily avg</th>
-          <th style="${thStyle}" colspan="2">Sales daily avg</th>
+          <th style="${thStyle}" rowspan="2">MTD</th>
+          <th style="${thStyle}" colspan="2">Prospect total</th>
+          <th style="${thStyle}" colspan="2">Sales total</th>
           <th style="${thStyle}" rowspan="2">Conv. rate</th>
         </tr>
         <tr>
-          <th style="${thStyle}">CC</th>
-          <th style="${thStyle}">MV</th>
-          <th style="${thStyle}">CC</th>
-          <th style="${thStyle}">MV</th>
           <th style="${thStyle}">CC</th>
           <th style="${thStyle}">MV</th>
           <th style="${thStyle}">CC</th>
@@ -142,7 +127,7 @@ function renderServiceOverviewTable(
     </table>
     ${
       periodNote
-        ? `<div style="font-size:10px;color:#757575;margin:8px 0 0 0;line-height:1.35;">MTD Daily Avg / LM: each cell averages only days where that metric exists (missing data omitted). Zeros are included. Denominators can differ by metric. Up to ${periodNote.mtdDaysCounted} MTD day(s) and ${periodNote.lmDaysCounted} LM day(s) with prospect snapshots.</div>`
+        ? `<div style="font-size:10px;color:#757575;margin:8px 0 0 0;line-height:1.35;">MTD totals sum daily snapshots in range (missing days omitted). Last month totals sum the full prior calendar month where snapshots exist. Up to ${periodNote.mtdDaysCounted} MTD day(s) and ${periodNote.lmDaysCounted} LM day(s) with prospect snapshots.</div>`
         : ''
     }`;
 }
@@ -324,10 +309,10 @@ export function buildDailyEmailSubject(report: DailyEmailReportData): string {
 export function renderDailyEmailText(report: DailyEmailReportData): string {
   const totals = report.prospects.totalsRow;
   const lines = report.prospects.rows.map((r) => {
-    const pr = `pr d ${r.prospectCc}/${r.prospectMv} mtd ${r.prospectMtdCc}/${r.prospectMtdMv} avg ${fmtAvgCell(r.prospectMtdAvgCc)}/${fmtAvgCell(r.prospectMtdAvgMv)}`;
-    const sa = `sa d ${r.salesCc}/${r.salesMv} mtd ${r.salesMtdCc}/${r.salesMtdMv} avg ${fmtAvgCell(r.salesMtdAvgCc)}/${fmtAvgCell(r.salesMtdAvgMv)}`;
+    const pr = `pr d ${r.prospectCc}/${r.prospectMv} mtd ${r.prospectMtdCc}/${r.prospectMtdMv}`;
+    const sa = `sa d ${r.salesCc}/${r.salesMv} mtd ${r.salesMtdCc}/${r.salesMtdMv}`;
     const cv = `conv ${r.conversionRate} mtd ${r.conversionRateMtd}`;
-    const lm = `LM pr ${fmtAvgCell(r.lmProspectDailyAvgCc)}/${fmtAvgCell(r.lmProspectDailyAvgMv)} sa ${fmtAvgCell(r.lmSalesDailyAvgCc)}/${fmtAvgCell(r.lmSalesDailyAvgMv)} cv ${r.lmConversionRate}`;
+    const lm = `LM pr ${r.lmProspectTotalCc}/${r.lmProspectTotalMv} sa ${r.lmSalesTotalCc}/${r.lmSalesTotalMv} cv ${r.lmConversionRate}`;
     return `  ${r.label}: ${pr} | ${sa} | ${cv} | ${lm}`;
   });
 
@@ -338,7 +323,7 @@ export function renderDailyEmailText(report: DailyEmailReportData): string {
     '',
     '1. Service Overview',
     ...lines,
-    `  TOTALS: pr d ${totals.prospectCc}/${totals.prospectMv} mtd ${totals.prospectMtdCc}/${totals.prospectMtdMv} | sa d ${totals.salesCc}/${totals.salesMv} mtd ${totals.salesMtdCc}/${totals.salesMtdMv} | conv ${totals.conversionRate} mtd ${totals.conversionRateMtd} | LM pr ${fmtAvgCell(totals.lmProspectDailyAvgCc)}/${fmtAvgCell(totals.lmProspectDailyAvgMv)} sa ${fmtAvgCell(totals.lmSalesDailyAvgCc)}/${fmtAvgCell(totals.lmSalesDailyAvgMv)} cv ${totals.lmConversionRate}`,
+    `  TOTALS: pr d ${totals.prospectCc}/${totals.prospectMv} mtd ${totals.prospectMtdCc}/${totals.prospectMtdMv} | sa d ${totals.salesCc}/${totals.salesMv} mtd ${totals.salesMtdCc}/${totals.salesMtdMv} | conv ${totals.conversionRate} mtd ${totals.conversionRateMtd} | LM pr ${totals.lmProspectTotalCc}/${totals.lmProspectTotalMv} sa ${totals.lmSalesTotalCc}/${totals.lmSalesTotalMv} cv ${totals.lmConversionRate}`,
     '',
     '2. CSAT & Reply Rate',
     '  (data pending —)',

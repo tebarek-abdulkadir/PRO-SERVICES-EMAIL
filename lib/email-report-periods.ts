@@ -237,6 +237,10 @@ export function applyPeriodAggregatesToRows(
       lmProspectDailyAvgMv,
       lmSalesDailyAvgCc,
       lmSalesDailyAvgMv,
+      lmProspectTotalCc: l.pcc,
+      lmProspectTotalMv: l.pmv,
+      lmSalesTotalCc: l.scc,
+      lmSalesTotalMv: l.smv,
       lmConversionRate,
     };
   });
@@ -325,6 +329,17 @@ export function computeExtendedTotalsRow(
   const lmSalesDailyAvgMv = eligibleDailyMean(lmDailySmv);
   const lmConversionRate = formatServiceConversionRate(lmProsSum, lmSalSum);
 
+  let lmProspectTotalCc = 0;
+  let lmProspectTotalMv = 0;
+  let lmSalesTotalCc = 0;
+  let lmSalesTotalMv = 0;
+  for (const r of rows) {
+    lmProspectTotalCc += r.lmProspectTotalCc;
+    lmProspectTotalMv += r.lmProspectTotalMv;
+    lmSalesTotalCc += r.lmSalesTotalCc;
+    lmSalesTotalMv += r.lmSalesTotalMv;
+  }
+
   return {
     label: 'TOTALS',
     prospectCc,
@@ -345,6 +360,10 @@ export function computeExtendedTotalsRow(
     lmProspectDailyAvgMv,
     lmSalesDailyAvgCc,
     lmSalesDailyAvgMv,
+    lmProspectTotalCc,
+    lmProspectTotalMv,
+    lmSalesTotalCc,
+    lmSalesTotalMv,
     lmConversionRate,
   };
 }
