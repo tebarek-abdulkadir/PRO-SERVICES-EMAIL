@@ -10,12 +10,10 @@ import {
 } from '@/lib/email-report-layout';
 import {
   applyPeriodAggregatesToRows,
-  applyStaticLastMonthToRows,
   computeExtendedTotalsRow,
   loadServiceOverviewSnapshots,
   mtdDateRange,
 } from '@/lib/email-report-periods';
-import { SERVICE_OVERVIEW_LM_STATIC } from '@/lib/service-overview-lm-static';
 import type { EmailSalesCcMvSplit, EnrichedProspectDetail } from '@/lib/prospects-report';
 import { getDashboardProspectsData } from '@/lib/prospects-report';
 import type { ByContractType, Prospects } from '@/lib/types';
@@ -50,12 +48,6 @@ export interface DailyEmailReportData {
     totalsRow: ServiceOverviewRow;
     /** Days in MTD window that had complete prospect/sales data */
     mtdDaysCounted: number;
-    /** Days in the static LM snapshot that had complete prospect/sales data */
-    lmDaysCounted: number;
-    /** Calendar days in the LM month (denominator for LM coverage) */
-    lmCalendarDays: number;
-    /** Calendar month the frozen LM block refers to (e.g. March 2026) */
-    lmStaticSourceMonthLabel: string;
     /** Sum of prospect CC + MV across rows */
     total: number;
     /** Sum of sales CC + MV across rows */
@@ -135,12 +127,8 @@ async function getProspectsAndSalesBlock(
 
   const mtdDates = mtdDateRange(date);
   const mtdSnapshots = await loadServiceOverviewSnapshots(mtdDates);
-  const { rows: mtdRows, mtdDaysCounted } = applyPeriodAggregatesToRows(rows, mtdSnapshots, []);
-  const periodRows = applyStaticLastMonthToRows(mtdRows, SERVICE_OVERVIEW_LM_STATIC);
-  const totalsRow = computeExtendedTotalsRow(periodRows, mtdSnapshots, [], {
-    staticLmTotals: SERVICE_OVERVIEW_LM_STATIC.totals,
-  });
-  const lmStatic = SERVICE_OVERVIEW_LM_STATIC;
+  const { rows: periodRows, mtdDaysCounted } = applyPeriodAggregatesToRows(rows, mtdSnapshots, []);
+  const totalsRow = computeExtendedTotalsRow(periodRows, mtdSnapshots, []);
 
   return {
     columnLabelShort,
@@ -148,9 +136,6 @@ async function getProspectsAndSalesBlock(
       rows: periodRows,
       totalsRow,
       mtdDaysCounted,
-      lmDaysCounted: lmStatic.lmDaysCounted,
-      lmCalendarDays: lmStatic.lmCalendarDays,
-      lmStaticSourceMonthLabel: lmStatic.sourceCalendarMonthLabel,
       total: totalProspects,
       totalSales: totalSalesCount,
       totalConversionRate: formatServiceConversionRate(totalProspects, totalSalesCount),

@@ -63,22 +63,17 @@ function serviceDataCells(row: ServiceOverviewRow, bold = false): string {
           <td style="${s}">${row.salesMtdMv}</td>
           <td style="${s}">${escapeHtml(row.conversionRate)}</td>
           <td style="${s}">${escapeHtml(row.conversionRateMtd)}</td>
-          <td style="${s}">${fmtAvgCell(row.lmProspectDailyAvgCc)}</td>
-          <td style="${s}">${fmtAvgCell(row.lmProspectDailyAvgMv)}</td>
-          <td style="${s}">${fmtAvgCell(row.lmSalesDailyAvgCc)}</td>
-          <td style="${s}">${fmtAvgCell(row.lmSalesDailyAvgMv)}</td>
-          <td style="${s}">${escapeHtml(row.lmConversionRate)}</td>`;
+          ${mtdPendingCell()}
+          ${mtdPendingCell()}
+          ${mtdPendingCell()}
+          ${mtdPendingCell()}
+          ${mtdPendingCell()}`;
 }
 
 function renderServiceOverviewTable(
   rows: ServiceOverviewRow[],
   totals: ServiceOverviewRow,
-  periodNote?: {
-    mtdDaysCounted: number;
-    lmDaysCounted: number;
-    lmCalendarDays: number;
-    lmStaticSourceMonthLabel: string;
-  }
+  periodNote?: { mtdDaysCounted: number }
 ): string {
   const bodyRows = rows
     .map((row, i) => {
@@ -137,7 +132,7 @@ function renderServiceOverviewTable(
     </table>
     ${
       periodNote
-        ? `<div style="font-size:10px;color:#757575;margin:8px 0 0 0;line-height:1.35;">MTD total columns sum each saved day from the 1st of the report month through the report date (${periodNote.mtdDaysCounted} day(s) with snapshots; missing days are skipped). LM (last month) columns use a <strong>fixed snapshot</strong> for ${escapeHtml(periodNote.lmStaticSourceMonthLabel)}: <strong>daily averages</strong> across days with data in that month (${periodNote.lmDaysCounted} of ${periodNote.lmCalendarDays} calendar days)—same methodology as before, not month-long sums. Averages reflect the committed snapshot only. LM conversion % uses summed LM prospect and sales totals.</div>`
+        ? `<div style="font-size:10px;color:#757575;margin:8px 0 0 0;line-height:1.35;">MTD total columns sum each saved day from the 1st of the report month through the report date (${periodNote.mtdDaysCounted} day(s) with snapshots; missing days are skipped). LM (last month) columns show <strong>${escapeHtml(MTD_PENDING_LABEL)}</strong> until that access is available.</div>`
         : ''
     }`;
 }
@@ -322,7 +317,7 @@ export function renderDailyEmailText(report: DailyEmailReportData): string {
     const pr = `pr d ${r.prospectCc}/${r.prospectMv} mtd ${r.prospectMtdCc}/${r.prospectMtdMv}`;
     const sa = `sa d ${r.salesCc}/${r.salesMv} mtd ${r.salesMtdCc}/${r.salesMtdMv}`;
     const cv = `conv ${r.conversionRate} mtd ${r.conversionRateMtd}`;
-    const lm = `LM pr avg ${fmtAvgCell(r.lmProspectDailyAvgCc)}/${fmtAvgCell(r.lmProspectDailyAvgMv)} sa avg ${fmtAvgCell(r.lmSalesDailyAvgCc)}/${fmtAvgCell(r.lmSalesDailyAvgMv)} cv ${r.lmConversionRate}`;
+    const lm = `LM ${MTD_PENDING_LABEL}`;
     return `  ${r.label}: ${pr} | ${sa} | ${cv} | ${lm}`;
   });
 
@@ -333,7 +328,7 @@ export function renderDailyEmailText(report: DailyEmailReportData): string {
     '',
     '1. Service Overview',
     ...lines,
-    `  TOTALS: pr d ${totals.prospectCc}/${totals.prospectMv} mtd ${totals.prospectMtdCc}/${totals.prospectMtdMv} | sa d ${totals.salesCc}/${totals.salesMv} mtd ${totals.salesMtdCc}/${totals.salesMtdMv} | conv ${totals.conversionRate} mtd ${totals.conversionRateMtd} | LM pr avg ${fmtAvgCell(totals.lmProspectDailyAvgCc)}/${fmtAvgCell(totals.lmProspectDailyAvgMv)} sa avg ${fmtAvgCell(totals.lmSalesDailyAvgCc)}/${fmtAvgCell(totals.lmSalesDailyAvgMv)} cv ${totals.lmConversionRate}`,
+    `  TOTALS: pr d ${totals.prospectCc}/${totals.prospectMv} mtd ${totals.prospectMtdCc}/${totals.prospectMtdMv} | sa d ${totals.salesCc}/${totals.salesMv} mtd ${totals.salesMtdCc}/${totals.salesMtdMv} | conv ${totals.conversionRate} mtd ${totals.conversionRateMtd} | LM ${MTD_PENDING_LABEL}`,
     '',
     '2. CSAT & Reply Rate',
     '  (data pending —)',
@@ -375,9 +370,6 @@ export function renderDailyEmailHtml(report: DailyEmailReportData): string {
               ${sectionTitle('1', 'Service Overview')}
               ${renderServiceOverviewTable(report.prospects.rows, totals, {
                 mtdDaysCounted: report.prospects.mtdDaysCounted,
-                lmDaysCounted: report.prospects.lmDaysCounted,
-                lmCalendarDays: report.prospects.lmCalendarDays,
-                lmStaticSourceMonthLabel: report.prospects.lmStaticSourceMonthLabel,
               })}
               ${sectionTitle('2', 'CSAT & Reply Rate')}
               ${renderCsatReplyRateTable()}
