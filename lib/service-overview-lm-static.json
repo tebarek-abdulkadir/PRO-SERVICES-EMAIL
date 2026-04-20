@@ -1,0 +1,107 @@
+{
+  "sourceCalendarMonth": "2026-03",
+  "sourceCalendarMonthLabel": "March 2026",
+  "lmCalendarDays": 31,
+  "lmDaysCounted": 0,
+  "byLabel": {
+    "OEC": {
+      "lmProspectDailyAvgCc": 0,
+      "lmProspectDailyAvgMv": 0,
+      "lmSalesDailyAvgCc": 0,
+      "lmSalesDailyAvgMv": 0,
+      "lmProspectTotalCc": 0,
+      "lmProspectTotalMv": 0,
+      "lmSalesTotalCc": 0,
+      "lmSalesTotalMv": 0,
+      "lmConversionRate": "0%"
+    },
+    "OWWA": {
+      "lmProspectDailyAvgCc": 0,
+      "lmProspectDailyAvgMv": 0,
+      "lmSalesDailyAvgCc": 0,
+      "lmSalesDailyAvgMv": 0,
+      "lmProspectTotalCc": 0,
+      "lmProspectTotalMv": 0,
+      "lmSalesTotalCc": 0,
+      "lmSalesTotalMv": 0,
+      "lmConversionRate": "0%"
+    },
+    "Visa Lebanon": {
+      "lmProspectDailyAvgCc": 0,
+      "lmProspectDailyAvgMv": 0,
+      "lmSalesDailyAvgCc": 0,
+      "lmSalesDailyAvgMv": 0,
+      "lmProspectTotalCc": 0,
+      "lmProspectTotalMv": 0,
+      "lmSalesTotalCc": 0,
+      "lmSalesTotalMv": 0,
+      "lmConversionRate": "0%"
+    },
+    "Visa Egypt": {
+      "lmProspectDailyAvgCc": 0,
+      "lmProspectDailyAvgMv": 0,
+      "lmSalesDailyAvgCc": 0,
+      "lmSalesDailyAvgMv": 0,
+      "lmProspectTotalCc": 0,
+      "lmProspectTotalMv": 0,
+      "lmSalesTotalCc": 0,
+      "lmSalesTotalMv": 0,
+      "lmConversionRate": "0%"
+    },
+    "Visa Jordan": {
+      "lmProspectDailyAvgCc": 0,
+      "lmProspectDailyAvgMv": 0,
+      "lmSalesDailyAvgCc": 0,
+      "lmSalesDailyAvgMv": 0,
+      "lmProspectTotalCc": 0,
+      "lmProspectTotalMv": 0,
+      "lmSalesTotalCc": 0,
+      "lmSalesTotalMv": 0,
+      "lmConversionRate": "0%"
+    },
+    "Visa Schengen": {
+      "lmProspectDailyAvgCc": 0,
+      "lmProspectDailyAvgMv": 0,
+      "lmSalesDailyAvgCc": 0,
+      "lmSalesDailyAvgMv": 0,
+      "lmProspectTotalCc": 0,
+      "lmProspectTotalMv": 0,
+      "lmSalesTotalCc": 0,
+      "lmSalesTotalMv": 0,
+      "lmConversionRate": "0%"
+    },
+    "Passport Filipina": {
+      "lmProspectDailyAvgCc": 0,
+      "lmProspectDailyAvgMv": 0,
+      "lmSalesDailyAvgCc": 0,
+      "lmSalesDailyAvgMv": 0,
+      "lmProspectTotalCc": 0,
+      "lmProspectTotalMv": 0,
+      "lmSalesTotalCc": 0,
+      "lmSalesTotalMv": 0,
+      "lmConversionRate": "0%"
+    },
+    "Passport Ethiopian": {
+      "lmProspectDailyAvgCc": 0,
+      "lmProspectDailyAvgMv": 0,
+      "lmSalesDailyAvgCc": 0,
+      "lmSalesDailyAvgMv": 0,
+      "lmProspectTotalCc": 0,
+      "lmProspectTotalMv": 0,
+      "lmSalesTotalCc": 0,
+      "lmSalesTotalMv": 0,
+      "lmConversionRate": "0%"
+    }
+  },
+  "totals": {
+    "lmProspectDailyAvgCc": 0,
+    "lmProspectDailyAvgMv": 0,
+    "lmSalesDailyAvgCc": 0,
+    "lmSalesDailyAvgMv": 0,
+    "lmProspectTotalCc": 0,
+    "lmProspectTotalMv": 0,
+    "lmSalesTotalCc": 0,
+    "lmSalesTotalMv": 0,
+    "lmConversionRate": "0%"
+  }
+}

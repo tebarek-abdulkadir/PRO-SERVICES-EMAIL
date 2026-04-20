@@ -4,6 +4,7 @@ import {
   formatServiceConversionRate,
   type ServiceOverviewRow,
 } from '@/lib/email-report-layout';
+import type { ServiceOverviewLmRowSlice, ServiceOverviewLmStatic } from '@/lib/service-overview-lm-static';
 import { getDashboardProspectsData } from '@/lib/prospects-report';
 
 function pad2(n: number): string {
@@ -248,11 +249,53 @@ export function applyPeriodAggregatesToRows(
   return { rows, mtdDaysCounted: mtdN, lmDaysCounted: lmN };
 }
 
+function lmSliceToRowFields(lm: ServiceOverviewLmRowSlice): Pick<
+  ServiceOverviewRow,
+  | 'lmProspectDailyAvgCc'
+  | 'lmProspectDailyAvgMv'
+  | 'lmSalesDailyAvgCc'
+  | 'lmSalesDailyAvgMv'
+  | 'lmProspectTotalCc'
+  | 'lmProspectTotalMv'
+  | 'lmSalesTotalCc'
+  | 'lmSalesTotalMv'
+  | 'lmConversionRate'
+> {
+  return {
+    lmProspectDailyAvgCc: lm.lmProspectDailyAvgCc,
+    lmProspectDailyAvgMv: lm.lmProspectDailyAvgMv,
+    lmSalesDailyAvgCc: lm.lmSalesDailyAvgCc,
+    lmSalesDailyAvgMv: lm.lmSalesDailyAvgMv,
+    lmProspectTotalCc: lm.lmProspectTotalCc,
+    lmProspectTotalMv: lm.lmProspectTotalMv,
+    lmSalesTotalCc: lm.lmSalesTotalCc,
+    lmSalesTotalMv: lm.lmSalesTotalMv,
+    lmConversionRate: lm.lmConversionRate,
+  };
+}
+
+/** Replace LM columns using the committed static snapshot (see `service-overview-lm-static.json`). */
+export function applyStaticLastMonthToRows(
+  rows: ServiceOverviewRow[],
+  staticLm: ServiceOverviewLmStatic
+): ServiceOverviewRow[] {
+  return rows.map((row) => {
+    const lm = staticLm.byLabel[row.label];
+    if (!lm) {
+      throw new Error(
+        `service-overview-lm-static.json is missing LM data for row "${row.label}". Run npm run build:service-overview-lm-static.`
+      );
+    }
+    return { ...row, ...lmSliceToRowFields(lm) };
+  });
+}
+
 /** Totals row with same shape as detail rows (sums + derived averages). */
 export function computeExtendedTotalsRow(
   rows: ServiceOverviewRow[],
   mtdSnapshots: ServiceOverviewRow[][],
-  lmSnapshots: ServiceOverviewRow[][]
+  lmSnapshots: ServiceOverviewRow[][],
+  options?: { staticLmTotals?: ServiceOverviewLmRowSlice }
 ): ServiceOverviewRow {
   let prospectCc = 0;
   let prospectMv = 0;
@@ -297,47 +340,57 @@ export function computeExtendedTotalsRow(
   const conversionRate = formatServiceConversionRate(pt, st);
   const conversionRateMtd = formatServiceConversionRate(prospectMtdCc + prospectMtdMv, salesMtdCc + salesMtdMv);
 
-  let lmProsSum = 0;
-  let lmSalSum = 0;
-  const lmDailyPcc: number[] = [];
-  const lmDailyPmv: number[] = [];
-  const lmDailyScc: number[] = [];
-  const lmDailySmv: number[] = [];
-  if (lmSnapshots.length > 0) {
-    for (const snap of lmSnapshots) {
-      let dayPcc = 0;
-      let dayPmv = 0;
-      let dayScc = 0;
-      let daySmv = 0;
-      for (const r of snap) {
-        dayPcc += r.prospectCc;
-        dayPmv += r.prospectMv;
-        dayScc += r.salesCc;
-        daySmv += r.salesMv;
+  let lmTotalsSlice: ServiceOverviewLmRowSlice;
+  if (options?.staticLmTotals) {
+    lmTotalsSlice = options.staticLmTotals;
+  } else {
+    let lmProsSum = 0;
+    let lmSalSum = 0;
+    const lmDailyPcc: number[] = [];
+    const lmDailyPmv: number[] = [];
+    const lmDailyScc: number[] = [];
+    const lmDailySmv: number[] = [];
+    if (lmSnapshots.length > 0) {
+      for (const snap of lmSnapshots) {
+        let dayPcc = 0;
+        let dayPmv = 0;
+        let dayScc = 0;
+        let daySmv = 0;
+        for (const r of snap) {
+          dayPcc += r.prospectCc;
+          dayPmv += r.prospectMv;
+          dayScc += r.salesCc;
+          daySmv += r.salesMv;
+        }
+        lmDailyPcc.push(dayPcc);
+        lmDailyPmv.push(dayPmv);
+        lmDailyScc.push(dayScc);
+        lmDailySmv.push(daySmv);
+        lmProsSum += dayPcc + dayPmv;
+        lmSalSum += dayScc + daySmv;
       }
-      lmDailyPcc.push(dayPcc);
-      lmDailyPmv.push(dayPmv);
-      lmDailyScc.push(dayScc);
-      lmDailySmv.push(daySmv);
-      lmProsSum += dayPcc + dayPmv;
-      lmSalSum += dayScc + daySmv;
     }
-  }
-  const lmProspectDailyAvgCc = eligibleDailyMean(lmDailyPcc);
-  const lmProspectDailyAvgMv = eligibleDailyMean(lmDailyPmv);
-  const lmSalesDailyAvgCc = eligibleDailyMean(lmDailyScc);
-  const lmSalesDailyAvgMv = eligibleDailyMean(lmDailySmv);
-  const lmConversionRate = formatServiceConversionRate(lmProsSum, lmSalSum);
-
-  let lmProspectTotalCc = 0;
-  let lmProspectTotalMv = 0;
-  let lmSalesTotalCc = 0;
-  let lmSalesTotalMv = 0;
-  for (const r of rows) {
-    lmProspectTotalCc += r.lmProspectTotalCc;
-    lmProspectTotalMv += r.lmProspectTotalMv;
-    lmSalesTotalCc += r.lmSalesTotalCc;
-    lmSalesTotalMv += r.lmSalesTotalMv;
+    let lmProspectTotalCc = 0;
+    let lmProspectTotalMv = 0;
+    let lmSalesTotalCc = 0;
+    let lmSalesTotalMv = 0;
+    for (const r of rows) {
+      lmProspectTotalCc += r.lmProspectTotalCc;
+      lmProspectTotalMv += r.lmProspectTotalMv;
+      lmSalesTotalCc += r.lmSalesTotalCc;
+      lmSalesTotalMv += r.lmSalesTotalMv;
+    }
+    lmTotalsSlice = {
+      lmProspectDailyAvgCc: eligibleDailyMean(lmDailyPcc),
+      lmProspectDailyAvgMv: eligibleDailyMean(lmDailyPmv),
+      lmSalesDailyAvgCc: eligibleDailyMean(lmDailyScc),
+      lmSalesDailyAvgMv: eligibleDailyMean(lmDailySmv),
+      lmProspectTotalCc,
+      lmProspectTotalMv,
+      lmSalesTotalCc,
+      lmSalesTotalMv,
+      lmConversionRate: formatServiceConversionRate(lmProsSum, lmSalSum),
+    };
   }
 
   return {
@@ -356,14 +409,6 @@ export function computeExtendedTotalsRow(
     salesMtdAvgMv,
     conversionRate,
     conversionRateMtd,
-    lmProspectDailyAvgCc,
-    lmProspectDailyAvgMv,
-    lmSalesDailyAvgCc,
-    lmSalesDailyAvgMv,
-    lmProspectTotalCc,
-    lmProspectTotalMv,
-    lmSalesTotalCc,
-    lmSalesTotalMv,
-    lmConversionRate,
+    ...lmSliceToRowFields(lmTotalsSlice),
   };
 }
