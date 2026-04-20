@@ -28,8 +28,16 @@ const tdMuted = `padding:8px 10px;border:1px solid #bdc3c7;font-size:12px;color:
 const tdMtdPending = `padding:6px 4px;border:1px solid #bdc3c7;font-size:9px;line-height:1.15;color:#5f6368;font-family:${font};text-align:center;vertical-align:middle;max-width:92px;word-wrap:break-word`;
 const MTD_PENDING_LABEL = 'Pending Vercel Pro Account';
 
+/** Single merged LM cell (replaces five columns) — compact width. */
+const tdLmMerged = `padding:4px 6px;border:1px solid #bdc3c7;font-size:9px;line-height:1.2;color:#5f6368;font-family:${font};text-align:center;vertical-align:middle;max-width:108px;width:108px;word-wrap:break-word`;
+
 function mtdPendingCell(): string {
   return `<td style="${tdMtdPending}">${escapeHtml(MTD_PENDING_LABEL)}</td>`;
+}
+
+function lmMergedPendingCell(bold = false): string {
+  const extra = bold ? ';font-weight:bold;background:#d9e2f3' : '';
+  return `<td colspan="5" style="${tdLmMerged}${extra}">${escapeHtml(MTD_PENDING_LABEL)}</td>`;
 }
 
 const CSAT_SERVICE_ROWS = [
@@ -63,11 +71,7 @@ function serviceDataCells(row: ServiceOverviewRow, bold = false): string {
           <td style="${s}">${row.salesMtdMv}</td>
           <td style="${s}">${escapeHtml(row.conversionRate)}</td>
           <td style="${s}">${escapeHtml(row.conversionRateMtd)}</td>
-          ${mtdPendingCell()}
-          ${mtdPendingCell()}
-          ${mtdPendingCell()}
-          ${mtdPendingCell()}
-          ${mtdPendingCell()}`;
+          ${lmMergedPendingCell(bold)}`;
 }
 
 function renderServiceOverviewTable(
@@ -87,14 +91,14 @@ function renderServiceOverviewTable(
     .join('');
 
   return `
-    <table role="presentation" width="100%" style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:920px;margin:0 0 24px 0;mso-table-lspace:0pt;mso-table-rspace:0pt;table-layout:auto;" cellspacing="0" cellpadding="0">
+    <table role="presentation" width="100%" style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:780px;margin:0 0 24px 0;mso-table-lspace:0pt;mso-table-rspace:0pt;table-layout:fixed;" cellspacing="0" cellpadding="0">
       <thead>
         <tr>
           <th style="${thLeft}" rowspan="3">Service Type</th>
           <th style="${thStyle}" colspan="4">Prospect</th>
           <th style="${thStyle}" colspan="4">Sales</th>
           <th style="${thStyle}" colspan="2">Conversion</th>
-          <th style="${thStyle}" colspan="5">LM (last month)</th>
+          <th style="${thStyle};font-size:10px;line-height:1.25;max-width:108px;width:108px" colspan="5" rowspan="3">LM (last month)</th>
         </tr>
         <tr>
           <th style="${thStyle}" colspan="2">Daily</th>
@@ -103,15 +107,8 @@ function renderServiceOverviewTable(
           <th style="${thStyle}" colspan="2">MTD total</th>
           <th style="${thStyle}" rowspan="2">Daily</th>
           <th style="${thStyle}" rowspan="2">MTD</th>
-          <th style="${thStyle}" colspan="2">Prospect daily avg</th>
-          <th style="${thStyle}" colspan="2">Sales daily avg</th>
-          <th style="${thStyle}" rowspan="2">Conv. rate</th>
         </tr>
         <tr>
-          <th style="${thStyle}">CC</th>
-          <th style="${thStyle}">MV</th>
-          <th style="${thStyle}">CC</th>
-          <th style="${thStyle}">MV</th>
           <th style="${thStyle}">CC</th>
           <th style="${thStyle}">MV</th>
           <th style="${thStyle}">CC</th>
@@ -241,10 +238,13 @@ function renderInitiatorComparisonTable(report: DailyEmailReportData): string {
   const colToday = escapeHtml(report.columnLabelShort);
   const b = report.byConversationEmail;
 
-  function row(label: string, today: typeof b.clientInitiatedToday): string {
+  /** Single shared value for both initiator rows (By Conversation). */
+  const sharedAvgResponseSeconds =
+    b.clientInitiatedToday.averageAgentResponseTimeSeconds ??
+    b.agentInitiatedToday.averageAgentResponseTimeSeconds;
+
+  function initiatorCells(today: typeof b.clientInitiatedToday): string {
     return `
-        <tr style="background:#fff">
-          <td style="${tdBase};font-weight:600">${escapeHtml(label)}</td>
           <td style="${tdBase};text-align:center">${today.totalChats}</td>
           ${mtdPendingCell()}
           <td style="${tdBase};text-align:center">${fmtCountPct(today.frustratedByBotCount, today.frustratedByBotPct)}</td>
@@ -256,10 +256,7 @@ function renderInitiatorComparisonTable(report: DailyEmailReportData): string {
           <td style="${tdBase};text-align:center">${fmtCountPct(today.confusedByAgentCount, today.confusedByAgentPct)}</td>
           ${mtdPendingCell()}
           <td style="${tdBase};text-align:center">${fmtScore(today.agentScoreAvg)}</td>
-          ${mtdPendingCell()}
-          <td style="${tdBase};text-align:center">${fmtAvgAgentResponseSeconds(today.averageAgentResponseTimeSeconds)}</td>
-          ${mtdPendingCell()}
-        </tr>`;
+          ${mtdPendingCell()}`;
   }
 
   return `
@@ -294,8 +291,16 @@ function renderInitiatorComparisonTable(report: DailyEmailReportData): string {
         </tr>
       </thead>
       <tbody>
-        ${row('Client Initiated Chats', b.clientInitiatedToday)}
-        ${row('Agent Initiated Chats', b.agentInitiatedToday)}
+        <tr style="background:#fff">
+          <td style="${tdBase};font-weight:600">${escapeHtml('Client Initiated Chats')}</td>
+          ${initiatorCells(b.clientInitiatedToday)}
+          <td rowspan="2" style="${tdBase};text-align:center;vertical-align:middle">${fmtAvgAgentResponseSeconds(sharedAvgResponseSeconds)}</td>
+          <td rowspan="2" style="${tdMtdPending};vertical-align:middle">${escapeHtml(MTD_PENDING_LABEL)}</td>
+        </tr>
+        <tr style="background:#fff">
+          <td style="${tdBase};font-weight:600">${escapeHtml('Agent Initiated Chats')}</td>
+          ${initiatorCells(b.agentInitiatedToday)}
+        </tr>
       </tbody>
     </table>`;
 }
