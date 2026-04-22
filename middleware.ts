@@ -7,6 +7,7 @@ function isIngestApiKeyRoute(pathname: string): boolean {
   if (pathname.startsWith("/api/ingest/")) return true;
   if (pathname === "/api/chat-analysis" || pathname.startsWith("/api/chat-analysis/"))
     return true;
+  if (pathname === "/api/evals" || pathname.startsWith("/api/evals/")) return true;
   if (/^\/api\/dates\/[^/]+\/delete$/.test(pathname)) return true;
   return false;
 }
