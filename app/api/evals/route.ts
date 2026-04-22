@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDailyEvalsData, getLatestEvalsData, saveDailyEvalsData, type EvalsDayDocument } from '@/lib/evals-storage';
+import { attachEvalsSummaryIfMissing, computeEvalsSummary } from '@/lib/evals-summary';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -69,12 +70,20 @@ export async function POST(request: Request) {
       );
     }
 
-    const { evalDate: _ed, analysisDate: _ad, lastUpdated: _lu, ...rest } = body;
-    const doc: EvalsDayDocument = {
+    const { evalDate: _ed, analysisDate: _ad, lastUpdated: _lu, summary: _clientSummary, ...rest } = body;
+    const lastUpdated = new Date().toISOString();
+    let doc: EvalsDayDocument = {
       ...rest,
-      lastUpdated: new Date().toISOString(),
+      lastUpdated,
       evalDate,
     };
+
+    if (Array.isArray(doc.conversations)) {
+      doc = {
+        ...doc,
+        summary: computeEvalsSummary(doc.conversations as unknown[]),
+      };
+    }
 
     await saveDailyEvalsData(doc);
 
@@ -110,8 +119,12 @@ export async function GET(request: Request) {
       data = await getLatestEvalsData();
     }
 
+    const payload = data
+      ? (attachEvalsSummaryIfMissing(data as Record<string, unknown>) as EvalsDayDocument)
+      : null;
+
     return NextResponse.json(
-      { success: true, data },
+      { success: true, data: payload as EvalsDayDocument | null },
       {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',

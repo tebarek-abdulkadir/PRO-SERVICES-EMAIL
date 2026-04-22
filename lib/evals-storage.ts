@@ -1,10 +1,12 @@
 import { put, list, del } from '@vercel/blob';
+import type { EvalsDaySummary } from './evals-summary';
 
 const EVALS_BLOB_PREFIX = 'evals';
 
 export type EvalsDayDocument = Record<string, unknown> & {
   lastUpdated: string;
   evalDate: string;
+  summary?: EvalsDaySummary;
 };
 
 /**
