@@ -178,8 +178,8 @@ export default function EvalsDashboard() {
         <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
           <h2 className="text-lg font-semibold text-slate-800">Tool evals</h2>
           <p className="text-xs text-slate-500 mt-1">
-            Chat-level percentages use distinct <code className="text-[11px]">conversationId</code> values (comma-split).
-            Tool-level percentages use total tool invocations.
+            “Total chats analyzed” uses comma-split unique IDs. “Conversations with …” counts distinct eval rows (full{' '}
+            <code className="text-[11px]">conversationId</code> string). Tool-level percentages use total tool invocations.
           </p>
         </div>
         <div className="px-5 py-2">
@@ -209,7 +209,8 @@ export default function EvalsDashboard() {
         <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
           <h2 className="text-lg font-semibold text-slate-800">Policy evals</h2>
           <p className="text-xs text-slate-500 mt-1">
-            Counts distinct conversation IDs with at least one flagged policy in that category.
+            Counts distinct eval rows (full <code className="text-[11px]">conversationId</code>) with at least one flagged
+            policy in that category.
           </p>
         </div>
         <div className="px-5 py-2">

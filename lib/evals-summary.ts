@@ -109,10 +109,10 @@ function rowHasUnclearPolicy(conv: Record<string, unknown>): boolean {
   return policyArrayLen(conv, 'Unclear_Policy') > 0;
 }
 
-function addRowIdsToSet(set: Set<string>, conv: Record<string, unknown>): void {
-  for (const id of conversationIdTokens(conv)) {
-    set.add(id);
-  }
+/** One key per eval row’s `conversationId` string (not comma-split). Avoids double-counting merged ids when comparing to per-tool counts. */
+function addEvalRowConversationKey(set: Set<string>, conv: Record<string, unknown>): void {
+  const key = String(conv.conversationId ?? '').trim();
+  if (key) set.add(key);
 }
 
 function pct(numerator: number, denominator: number): number {
@@ -122,7 +122,8 @@ function pct(numerator: number, denominator: number): number {
 
 /**
  * `conversations`: array of per-conversation eval rows (n8n / blob shape).
- * Chat-level metrics use **unique conversation IDs** (split on comma) across the day.
+ * `uniqueConversationIdCount` / denominators: split `conversationId` on comma (underlying CH ids).
+ * Tool/policy “conversations with …” counts: **distinct full `conversationId` strings** per eval row (one merged transcript = one row key).
  */
 export function computeEvalsSummary(conversations: unknown[]): EvalsDaySummary {
   const allIds = allConversationIdSet(conversations);
@@ -153,12 +154,12 @@ export function computeEvalsSummary(conversations: unknown[]): EvalsDaySummary {
       if (truthy(tool.Negative_Tool_Response)) negativeToolResponses += 1;
     }
 
-    if (rowHasWrongTool(conv)) addRowIdsToSet(wrongToolChatIds, conv);
-    if (rowHasNegativeToolResponse(conv)) addRowIdsToSet(negativeToolChatIds, conv);
-    if (rowHasMissedToolCall(conv)) addRowIdsToSet(missedToolChatIds, conv);
-    if (rowHasWrongPolicy(conv)) addRowIdsToSet(wrongPolicyChatIds, conv);
-    if (rowHasMissedPolicy(conv)) addRowIdsToSet(missedPolicyChatIds, conv);
-    if (rowHasUnclearPolicy(conv)) addRowIdsToSet(unclearPolicyChatIds, conv);
+    if (rowHasWrongTool(conv)) addEvalRowConversationKey(wrongToolChatIds, conv);
+    if (rowHasNegativeToolResponse(conv)) addEvalRowConversationKey(negativeToolChatIds, conv);
+    if (rowHasMissedToolCall(conv)) addEvalRowConversationKey(missedToolChatIds, conv);
+    if (rowHasWrongPolicy(conv)) addEvalRowConversationKey(wrongPolicyChatIds, conv);
+    if (rowHasMissedPolicy(conv)) addEvalRowConversationKey(missedPolicyChatIds, conv);
+    if (rowHasUnclearPolicy(conv)) addEvalRowConversationKey(unclearPolicyChatIds, conv);
   }
 
   const toolEvals: EvalsToolEvalSummary = {
