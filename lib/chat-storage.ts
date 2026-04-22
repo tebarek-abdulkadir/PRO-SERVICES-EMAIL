@@ -588,8 +588,14 @@ export async function aggregateDailyChatAnalysisResults(
     }
     
     // Create content hash
-    const issuesStr = (conv.mainIssues || []).map(i => i.trim().toLowerCase()).sort().join('|');
-    const phrasesStr = (conv.keyPhrases || []).map(p => p.trim().toLowerCase()).sort().join('|');
+    const issuesStr = (conv.mainIssues || [])
+      .map((i) => String(i ?? '').trim().toLowerCase())
+      .sort()
+      .join('|');
+    const phrasesStr = (conv.keyPhrases || [])
+      .map((p) => String(p ?? '').trim().toLowerCase())
+      .sort()
+      .join('|');
     const contentHash = `${issuesStr}_${phrasesStr}`.substring(0, 100);
     
     const contentKey = `${entityKey}_${timestampKey}_${conv.service || ''}_${conv.skill || ''}_${contentHash}`.replace(/[^a-zA-Z0-9_]/g, '_');
@@ -707,7 +713,7 @@ export async function aggregateDailyChatAnalysisResults(
   // Use mergedForResults to avoid duplicate entries in UI for same entity/content
   const results: ChatAnalysisResult[] = mergedForResults.map((conv) => {
     const fromLookup = resolveJoinedSkillsForMergedIds(String(conv.conversationId), joinedSkillsLookup);
-    const joinedSkillsMerged = mergeJoinedSkillsFields(conv.joinedSkills, fromLookup).trim();
+    const joinedSkillsMerged = (mergeJoinedSkillsFields(conv.joinedSkills, fromLookup) ?? '').trim();
     return {
       conversationId: conv.conversationId, // Already contains comma-separated IDs if merged
       frustrated: conv.frustrated,

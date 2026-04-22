@@ -43,6 +43,12 @@ function parseAgentScore(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Coerce ingest string arrays so null/number elements never reach storage code that calls .trim(). */
+function stringArrayFromIngest(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.map((x) => (x == null ? '' : String(x)).trim());
+}
+
 /**
  * After aggregation, re-apply joinedSkills, entity fields, conversation meta, byChatsView, and byConversationView
  * from the normalized POST body. This cannot be dropped by entity/content merge inside chat-storage.
@@ -85,7 +91,7 @@ function applyChatAnalysisFromRawIngest(
   const conversationResults: ChatAnalysisResult[] = data.conversationResults.map((r) => {
     const idCsv = String(r.conversationId);
     const fromRawJoined = resolveJoinedSkillsForMergedIds(idCsv, joinedLookup);
-    const joinedSkills = mergeJoinedSkillsFields(r.joinedSkills, fromRawJoined).trim();
+    const joinedSkills = (mergeJoinedSkillsFields(r.joinedSkills, fromRawJoined) ?? '').trim();
     const entity = resolveEntityFieldsForMergedIds(idCsv, entityLookup);
     const mergedEntity: RawIngestEntityFields = {
       contractId: entity.contractId || r.contractId,
@@ -281,8 +287,8 @@ export async function POST(request: Request): Promise<NextResponse<ChatAnalysisR
         chatStartDateTime: conv.chatStartDateTime || new Date().toISOString(),
         frustrated: Boolean(conv.frustrated),
         confused: Boolean(conv.confused),
-        mainIssues: Array.isArray(conv.mainIssues) ? conv.mainIssues : [],
-        keyPhrases: Array.isArray(conv.keyPhrases) ? conv.keyPhrases : [],
+        mainIssues: stringArrayFromIngest(conv.mainIssues),
+        keyPhrases: stringArrayFromIngest(conv.keyPhrases),
         service: conv.service,
         skill: conv.skill,
         joinedSkills,

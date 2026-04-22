@@ -43,10 +43,10 @@ function splitIds(csv: string): string[] {
 function mergeFrustratedBy(a?: string, b?: string): string | undefined {
   const na = norm(a);
   const nb = norm(b);
-  if (!na) return b?.trim();
-  if (!nb) return a?.trim();
-  if (na === 'agent' || nb === 'agent') return na === 'agent' ? a!.trim() : b!.trim();
-  return b!.trim();
+  if (!na) return b == null ? undefined : String(b).trim();
+  if (!nb) return a == null ? undefined : String(a).trim();
+  if (na === 'agent' || nb === 'agent') return na === 'agent' ? String(a).trim() : String(b).trim();
+  return String(b).trim();
 }
 
 function mergeMeta(a: MergedChatMeta, b: MergedChatMeta): MergedChatMeta {
