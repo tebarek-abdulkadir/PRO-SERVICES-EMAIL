@@ -109,6 +109,12 @@ function rowHasUnclearPolicy(conv: Record<string, unknown>): boolean {
   return policyArrayLen(conv, 'Unclear_Policy') > 0;
 }
 
+function addRowIdsToSet(set: Set<string>, conv: Record<string, unknown>): void {
+  for (const id of conversationIdTokens(conv)) {
+    set.add(id);
+  }
+}
+
 function pct(numerator: number, denominator: number): number {
   if (!denominator || !Number.isFinite(denominator)) return 0;
   return Math.round((numerator / denominator) * 1000) / 10;
