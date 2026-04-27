@@ -2,37 +2,21 @@ import { NextResponse } from 'next/server';
 import { getAvailableOperationsDates } from '@/lib/operations-storage';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
+/**
+ * GET /api/operations/dates — list YYYY-MM-DD keys that have operations/{date}.json in blob storage.
+ */
 export async function GET() {
-  try {
-    console.log('[Operations Dates] Fetching available dates from blob storage');
-    
-    const result = await getAvailableOperationsDates();
-    
-    if (!result.success) {
-      return NextResponse.json({
-        success: false,
-        message: 'Failed to fetch operations dates',
-        error: result.error
-      }, { status: 500 });
-    }
-    
-    console.log('[Operations Dates] Found dates:', result.dates);
-    
-    return NextResponse.json({
-      success: true,
-      dates: result.dates || [],
-      message: 'Available operations dates retrieved successfully'
-    });
-    
-  } catch (error) {
-    console.error('Error fetching operations dates:', error);
-    return NextResponse.json({
-      success: false,
-      message: 'Failed to fetch operations dates',
-      error: error instanceof Error ? error.message : String(error)
-    }, { status: 500 });
+  const result = await getAvailableOperationsDates();
+  if (!result.success) {
+    return NextResponse.json(
+      { success: false, error: result.error || 'Failed to list dates', dates: [] },
+      { status: 500 }
+    );
   }
+  return NextResponse.json({
+    success: true,
+    dates: result.dates ?? [],
+    count: result.dates?.length ?? 0,
+  });
 }
