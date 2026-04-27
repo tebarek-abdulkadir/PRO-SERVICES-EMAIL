@@ -47,6 +47,8 @@ export async function storeDailyOperations(
     const blob = await put(blobKey, JSON.stringify(dataToStore), {
       access: 'public',
       contentType: 'application/json',
+      addRandomSuffix: false,
+      allowOverwrite: true,
     });
 
     const totalMetrics = operationsData.operations?.length || 0;
