@@ -1191,15 +1191,9 @@
     }
     function getEvalsDaySummary(doc) {
       if (!doc || typeof doc !== 'object') return null;
-      if (doc.success === false) return null;
-      const root =
-        doc.success === true && doc.data != null && typeof doc.data === 'object' && !Array.isArray(doc.data)
-          ? doc.data
-          : doc;
-      if (!root || typeof root !== 'object') return null;
-      if (root.summary && root.summary.toolEvals && root.summary.policyEvals) return root.summary;
-      if (Array.isArray(root.conversations) && root.conversations.length > 0)
-        return computeEvalsSummaryFromConversations(root.conversations);
+      if (doc.summary && doc.summary.toolEvals && doc.summary.policyEvals) return doc.summary;
+      if (Array.isArray(doc.conversations) && doc.conversations.length > 0)
+        return computeEvalsSummaryFromConversations(doc.conversations);
       return null;
     }
     function evalsMtdSum(mtdSummaries, pick) {
@@ -1255,7 +1249,19 @@
       if (!hasAny) {
         return `<div style="margin:20px 0 0 0;font-family:${font}"><div style="font-size:16px;font-weight:bold;color:#2c3e50;margin:0 0 8px 0;">Evals</div><p style="font-size:12px;color:#5f6368;">No evals data for this period (<code>evals/daily/${escapeHtml(reportDate)}.json</code> missing or empty).</p></div>`;
       }
+      const t = todaySummary?.toolEvals;
+      const p = todaySummary?.policyEvals;
       const mtd = Array.isArray(mtdSummaries) ? mtdSummaries : [];
+      const d1 = t ? String(t.totalChatsAnalyzed) : EM;
+      const d2 = t ? String(t.totalToolCalls) : EM;
+      const d3 = t ? fmtCountPct(t.conversationsWithWrongToolCall, t.conversationsWithWrongToolCallPct) : EM;
+      const d4 = t ? fmtCountPct(t.wrongToolCalls, t.wrongToolCallsPct) : EM;
+      const d5 = t ? fmtCountPct(t.conversationsWithNegativeToolResponse, t.conversationsWithNegativeToolResponsePct) : EM;
+      const d6 = t ? fmtCountPct(t.negativeToolResponses, t.negativeToolResponsesPct) : EM;
+      const d7 = t ? fmtCountPct(t.conversationsWithMissedToolCall, t.conversationsWithMissedToolCallPct) : EM;
+      const d8 = p ? fmtCountPct(p.conversationsWithWrongPolicy, p.conversationsWithWrongPolicyPct) : EM;
+      const d9 = p ? fmtCountPct(p.conversationsWithMissedPolicy, p.conversationsWithMissedPolicyPct) : EM;
+      const d10 = p ? fmtCountPct(p.conversationsWithUnclearPolicy, p.conversationsWithUnclearPolicyPct) : EM;
       const m1 = evalsMtdSum(mtd, (s) => s.toolEvals.totalChatsAnalyzed);
       const m2 = evalsMtdSum(mtd, (s) => s.toolEvals.totalToolCalls);
       const m3 = formatEvalsPctCell(evalsMtdAvgChatPct(mtd, (s) => s.toolEvals.conversationsWithWrongToolCallPct));
@@ -1272,16 +1278,16 @@
         <table role="presentation" width="100%" style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:560px;margin:0 0 8px 0;mso-table-lspace:0pt;mso-table-rspace:0pt;" cellspacing="0" cellpadding="0"><thead><tr>
         <th style="${thLeft}">Metric</th><th style="${thStyle}">${escapeHtml(colToday)}</th><th style="${thStyle}">MTD</th>
         </tr></thead><tbody>
-        ${row('Total chats analyzed (unique conversation IDs)', 'API Error', m1 != null ? String(m1) : EM)}
-        ${row('Total tool calls', 'API Error', m2 != null ? String(m2) : EM)}
-        ${row('Conversations with wrong tool call', 'API Error', m3)}
-        ${row('Wrong tool calls (% of all tool calls)', 'API Error', m4)}
-        ${row('Conversations with negative tool response', 'API Error', m5)}
-        ${row('Negative tool responses (% of all tool calls)', 'API Error', m6)}
-        ${row('Conversations with missed tool call', 'API Error', m7)}
-        ${row('Conversations with wrong policy', 'API Error', m8)}
-        ${row('Conversations with missed policy', 'API Error', m9)}
-        ${row('Conversations with unclear policy', 'API Error', m10)}
+        ${row('Total chats analyzed (unique conversation IDs)', d1, m1 != null ? String(m1) : EM)}
+        ${row('Total tool calls', d2, m2 != null ? String(m2) : EM)}
+        ${row('Conversations with wrong tool call', d3, m3)}
+        ${row('Wrong tool calls (% of all tool calls)', d4, m4)}
+        ${row('Conversations with negative tool response', d5, m5)}
+        ${row('Negative tool responses (% of all tool calls)', d6, m6)}
+        ${row('Conversations with missed tool call', d7, m7)}
+        ${row('Conversations with wrong policy', d8, m8)}
+        ${row('Conversations with missed policy', d9, m9)}
+        ${row('Conversations with unclear policy', d10, m10)}
         </tbody></table></div>`;
     }
 

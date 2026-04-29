@@ -68,15 +68,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  /** Evals daily JSON is already public on Blob; allow read-only GET without dashboard session or ingest key. */
-  if (
-    path.startsWith("/api/") &&
-    (request.method === "GET" || request.method === "HEAD") &&
-    (path === "/api/evals" || path === "/api/evals/dates")
-  ) {
-    return NextResponse.next();
-  }
-
   if (path.startsWith("/api/")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
