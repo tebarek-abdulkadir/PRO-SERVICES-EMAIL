@@ -1,4 +1,4 @@
-import { head, list, put } from '@vercel/blob';
+import { del, head, list, put } from '@vercel/blob';
 import type { ComplaintsDailySummaryRow } from './complaints-daily-summary';
 import type { PnLComplaint, PnLServiceKey } from './pnl-complaints-types';
 import { getServiceKeyFromComplaintType } from './pnl-complaints-types';
@@ -41,6 +41,9 @@ export async function storeDailyComplaints(
     complaintsCount: number;
     summaryCount?: number;
     pathname: string;
+    blobUrl: string;
+    lastUpdated: string;
+    merged: boolean;
   };
   error?: string;
 }> {
@@ -123,6 +126,16 @@ export async function storeDailyComplaints(
 
     // Store in blob with date-based key
     const blobKey = `${BLOB_PREFIX}${date}.json`;
+    if (!mergeWithExisting) {
+      try {
+        await del(blobKey);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        if (!/not found|does not exist/i.test(msg)) {
+          console.warn(`[complaints-daily] del before replace (${blobKey}):`, msg);
+        }
+      }
+    }
     const blob = await put(blobKey, JSON.stringify(dailyData), {
       access: 'public',
       contentType: 'application/json',
@@ -146,6 +159,9 @@ export async function storeDailyComplaints(
         complaintsCount: finalComplaints.length,
         summaryCount: finalSummary?.length ?? 0,
         pathname: blobKey,
+        blobUrl: blob.url,
+        lastUpdated: dailyData.lastUpdated,
+        merged: mergeWithExisting,
       },
     };
   } catch (error) {

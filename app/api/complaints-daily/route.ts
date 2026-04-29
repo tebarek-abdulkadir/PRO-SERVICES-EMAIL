@@ -4,6 +4,10 @@ import type { PnLComplaint } from '@/lib/pnl-complaints-types';
 
 interface ComplaintRequest {
   date: string; // YYYY-MM-DD
+  /** When true, skip merge and delete existing blob before write (same as ?replace=1). */
+  replace?: boolean;
+  /** When false, skip merge (same as ?merge=false). */
+  merge?: boolean;
   summary?: Array<{
     COMPLAINT_TYPE?: string;
     complaint_type?: string;
@@ -83,9 +87,16 @@ export async function POST(request: NextRequest) {
     // Normalize all complaints
     const complaints = body.complaints.map(normalizeComplaint);
     const summary = 'summary' in body ? body.summary : undefined;
-    const merge =
-      request.nextUrl.searchParams.get('replace') !== '1' &&
-      request.nextUrl.searchParams.get('merge') !== 'false';
+    const replaceQuery = request.nextUrl.searchParams.get('replace') === '1';
+    const mergeFalseQuery = request.nextUrl.searchParams.get('merge') === 'false';
+    const replaceBody = body.replace === true;
+    const mergeFalseBody = body.merge === false;
+    const merge = !(
+      replaceQuery ||
+      mergeFalseQuery ||
+      replaceBody ||
+      mergeFalseBody
+    );
 
     const result = await storeDailyComplaints(body.date, complaints, merge, summary);
     
