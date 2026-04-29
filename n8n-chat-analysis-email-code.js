@@ -5,15 +5,28 @@
    * Evals: .../evals/daily/{YYYY-MM-DD}.json (summary + conversations; aligns with lib/evals-summary.ts).
    * Prospects: .../daily/{YYYY-MM-DD}.json (ProcessedConversation — lib/storage.ts).
    * Complaints: .../complaints-daily/{YYYY-MM-DD}.json — aligned with lib/prospects-report.ts + complaints-conversion-service.ts.
+  * Operations: .../operations/{YYYY-MM-DD}.json — Operations Summary table (same report day as this email).
+   *
+   * Blob store: paths after …vercel-storage.com are unchanged. ISO dates strictly before BLOB_STORE_CUTOFF_ISO use
+   * the legacy host; cutoff day and later use the new host (MTD / last month automatically mix per-day URLs).
    */
   const REPORT_TZ = 'Africa/Nairobi';
-  const BLOB_BASE =
-    'https://g3fss0a1hcyfvksn.public.blob.vercel-storage.com/chat-analysis/daily';
-  const DAILY_BLOB_BASE = 'https://g3fss0a1hcyfvksn.public.blob.vercel-storage.com/daily';
-  const COMPLAINTS_BLOB_BASE =
-    'https://g3fss0a1hcyfvksn.public.blob.vercel-storage.com/complaints-daily';
-  const EVALS_BLOB_BASE =
-    'https://g3fss0a1hcyfvksn.public.blob.vercel-storage.com/evals/daily';
+  /** YYYY-MM-DD (UTC calendar): this day and after → BLOB_HOST_CURRENT; all prior days → BLOB_HOST_LEGACY. */
+  const BLOB_STORE_CUTOFF_ISO = '2026-04-27';
+  const BLOB_HOST_LEGACY = 'https://g3fss0a1hcyfvksn.public.blob.vercel-storage.com';
+  const BLOB_HOST_CURRENT = 'https://jz7dbscl8dj75bnv.public.blob.vercel-storage.com';
+
+  function blobHostForIsoDate(dateStr) {
+    if (typeof dateStr !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return BLOB_HOST_CURRENT;
+    return dateStr < BLOB_STORE_CUTOFF_ISO ? BLOB_HOST_LEGACY : BLOB_HOST_CURRENT;
+  }
+
+  /** pathSuffix e.g. 'evals/daily' → {host}/evals/daily/{dateStr}.json with host chosen from dateStr. */
+  function blobJsonUrl(dateStr, pathSuffix) {
+    const tail = String(pathSuffix).replace(/^\/+|\/+$/g, '');
+    return `${blobHostForIsoDate(dateStr)}/${tail}/${dateStr}.json`;
+  }
+
   /** How far back to fetch complaint JSON files (each day one GET) for “complaints before date” filtering. */
   const COMPLAINT_BLOB_LOOKBACK_DAYS = 120;
 
@@ -1011,10 +1024,8 @@
     if (evalsTruthy(conv.hasUnclearPolicy)) return true;
     return evalsPolicyArrayLen(conv, 'Unclear_Policy') > 0;
   }
-  /** One key per eval row’s conversationId (not comma-split); matches dashboard evals-summary. */
-  function evalsAddEvalRowConversationKey(set, conv) {
-    const key = String(conv.conversationId ?? '').trim();
-    if (key) set.add(key);
+  function evalsAddRowIdsToSet(set, conv) {
+    for (const id of evalsConversationIdTokens(conv)) set.add(id);
   }
   function evalsPctNum(numerator, denominator) {
     if (!denominator || !Number.isFinite(denominator)) return 0;
@@ -1043,12 +1054,12 @@
         if (evalsTruthy(tool.Wrong_tool_call)) wrongToolCalls += 1;
         if (evalsTruthy(tool.Negative_Tool_Response)) negativeToolResponses += 1;
       }
-      if (evalsRowHasWrongTool(conv)) evalsAddEvalRowConversationKey(wrongToolChatIds, conv);
-      if (evalsRowHasNegativeToolResponse(conv)) evalsAddEvalRowConversationKey(negativeToolChatIds, conv);
-      if (evalsRowHasMissedToolCall(conv)) evalsAddEvalRowConversationKey(missedToolChatIds, conv);
-      if (evalsRowHasWrongPolicy(conv)) evalsAddEvalRowConversationKey(wrongPolicyChatIds, conv);
-      if (evalsRowHasMissedPolicy(conv)) evalsAddEvalRowConversationKey(missedPolicyChatIds, conv);
-      if (evalsRowHasUnclearPolicy(conv)) evalsAddEvalRowConversationKey(unclearPolicyChatIds, conv);
+      if (evalsRowHasWrongTool(conv)) evalsAddRowIdsToSet(wrongToolChatIds, conv);
+      if (evalsRowHasNegativeToolResponse(conv)) evalsAddRowIdsToSet(negativeToolChatIds, conv);
+      if (evalsRowHasMissedToolCall(conv)) evalsAddRowIdsToSet(missedToolChatIds, conv);
+      if (evalsRowHasWrongPolicy(conv)) evalsAddRowIdsToSet(wrongPolicyChatIds, conv);
+      if (evalsRowHasMissedPolicy(conv)) evalsAddRowIdsToSet(missedPolicyChatIds, conv);
+      if (evalsRowHasUnclearPolicy(conv)) evalsAddRowIdsToSet(unclearPolicyChatIds, conv);
     }
     const toolEvals = {
       totalChatsAnalyzed,
@@ -1182,7 +1193,7 @@
   }
 
   async function fetchBlob(dateStr) {
-    const url = `${BLOB_BASE}/${dateStr}.json`;
+    const url = blobJsonUrl(dateStr, 'chat-analysis/daily');
     try {
       const data = await this.helpers.httpRequest({
         method: 'GET',
@@ -1199,7 +1210,7 @@
   }
 
   async function fetchEvalsBlob(dateStr) {
-    const url = `${EVALS_BLOB_BASE}/${dateStr}.json`;
+    const url = blobJsonUrl(dateStr, 'evals/daily');
     try {
       const data = await this.helpers.httpRequest({
         method: 'GET',
@@ -1216,7 +1227,7 @@
   }
 
   async function fetchDailyBlob(dateStr) {
-    const url = `${DAILY_BLOB_BASE}/${dateStr}.json`;
+    const url = blobJsonUrl(dateStr, 'daily');
     try {
       const data = await this.helpers.httpRequest({
         method: 'GET',
@@ -1233,7 +1244,7 @@
   }
 
   async function fetchComplaintsBlob(dateStr) {
-    const url = `${COMPLAINTS_BLOB_BASE}/${dateStr}.json`;
+    const url = blobJsonUrl(dateStr, 'complaints-daily');
     try {
       const data = await this.helpers.httpRequest({
         method: 'GET',
@@ -1247,6 +1258,162 @@
       if (statusCode === 404) return null;
       return null;
     }
+  }
+
+  /** Public blob path operations/{YYYY-MM-DD}.json (same host rules as other blobs). */
+  async function fetchOperationsBlob(dateStr) {
+    const url = blobJsonUrl(dateStr, 'operations');
+    try {
+      const data = await this.helpers.httpRequest({
+        method: 'GET',
+        url,
+        json: true,
+        timeout: 30000,
+      });
+      return data ?? null;
+    } catch (error) {
+      const statusCode = error?.statusCode || error?.response?.status;
+      if (statusCode === 404) return null;
+      return null;
+    }
+  }
+
+  function parseOperationsBlobJson(raw) {
+    if (!raw) return null;
+    if (Array.isArray(raw) && raw[0]?.data?.operations) return raw[0].data;
+    if (raw.data?.operations) return raw.data;
+    if (Array.isArray(raw.operations)) return raw;
+    return null;
+  }
+
+  function opsBreakdownLabels(serviceType) {
+    const s = String(serviceType || '');
+    if (s === 'OEC/CV/OWWA') return { within: '&lt;14 days', exceeded: '&gt;14 days' };
+    return { within: '&le;21 days', exceeded: '&gt;21 days' };
+  }
+
+  function opsPctOfStarted(part, started) {
+    if (!(typeof started === 'number') || started <= 0 || part == null) return null;
+    return Math.round((part / started) * 1000) / 10;
+  }
+
+  function opsActiveFinishedCell(kind, serviceType, row) {
+    if (!row) {
+      return `<td style="${tdBase};text-align:center;vertical-align:middle">${EM}</td>`;
+    }
+    const started = Number(row.started_total) || 0;
+    const total = kind === 'active' ? Number(row.active_total) || 0 : Number(row.finished_total) || 0;
+    const wi =
+      kind === 'active'
+        ? Number(row.active_within_threshold) || 0
+        : Number(row.finished_within_threshold) || 0;
+    const ex =
+      kind === 'active'
+        ? Number(row.active_exceeded_threshold) || 0
+        : Number(row.finished_exceeded_threshold) || 0;
+    const p = opsPctOfStarted(total, started);
+    const mainLine =
+      p != null && Number.isFinite(p) ? `${total} (${formatPercent(p)})` : String(total);
+    if (serviceType === '__TOTAL__') {
+      return `<td style="${tdBase};text-align:center;vertical-align:middle;padding:6px 8px;">
+        <div style="font-weight:600;font-size:12px;">${escapeHtml(mainLine)}</div>
+      </td>`;
+    }
+    const labels = opsBreakdownLabels(serviceType);
+    const pWi = opsPctOfStarted(wi, started);
+    const pEx = opsPctOfStarted(ex, started);
+    const lineWithin =
+      pWi != null && Number.isFinite(pWi)
+        ? `${labels.within}: ${wi} (${formatPercent(pWi)})`
+        : `${labels.within}: ${wi}`;
+    const lineExceeded =
+      pEx != null && Number.isFinite(pEx)
+        ? `${labels.exceeded}: ${ex} (${formatPercent(pEx)})`
+        : `${labels.exceeded}: ${ex}`;
+    return `<td style="${tdBase};text-align:center;vertical-align:middle;padding:6px 8px;">
+      <div style="font-weight:600;font-size:12px;">${escapeHtml(mainLine)}</div>
+      <div style="font-size:10px;margin-top:6px;line-height:1.5;text-align:center;">
+        <div style="color:#1b5e20;font-weight:500;">${lineWithin}</div>
+        <div style="color:#b71c1c;font-weight:500;margin-top:2px;">${lineExceeded}</div>
+      </div>
+    </td>`;
+  }
+
+  function opsStartedCell(row) {
+    if (!row) return `<td style="${tdBase};text-align:center">${EM}</td>`;
+    return `<td style="${tdBase};text-align:center">${escapeHtml(String(row.started_total ?? 0))}</td>`;
+  }
+
+  function renderOperationsSummarySection(opsDoc, operationsBlobDateIso) {
+    const ops = opsDoc && Array.isArray(opsDoc.operations) ? opsDoc.operations : null;
+    if (!ops || ops.length === 0) {
+      return `${sectionTitle('3', 'Operations Summary')}<p style="font-family:${font};font-size:12px;color:#5f6368;">No operations data for <code>operations/${escapeHtml(operationsBlobDateIso)}.json</code> (report date in ${escapeHtml(REPORT_TZ)}).</p>`;
+    }
+    const byRange = (label) => {
+      const m = new Map();
+      for (const r of ops) {
+        if (r && r.range_label === label && r.service_type) m.set(r.service_type, r);
+      }
+      return m;
+    };
+    const m7 = byRange('last7Days');
+    const mMtd = byRange('mtd');
+    const lastMonthNote = 'New Platform data starts in April';
+    const svcSet = new Set();
+    for (const r of ops) {
+      if ((r.range_label === 'last7Days' || r.range_label === 'mtd') && r.service_type && r.service_type !== '__TOTAL__') {
+        svcSet.add(r.service_type);
+      }
+    }
+    const services = [...svcSet].sort((a, b) => a.localeCompare(b));
+    if (m7.has('__TOTAL__') || mMtd.has('__TOTAL__')) services.push('__TOTAL__');
+    const nRows = services.length;
+    const rowspanNote = nRows > 0 ? nRows : 1;
+    const sub = `font-size:10px;color:#5f6368;margin:0 0 10px 0;line-height:1.4;`;
+    let body = '';
+    if (nRows === 0) {
+      body = `<tr style="background:#fff;"><td style="${tdBase}" colspan="7">No <code>last7Days</code> or <code>mtd</code> rows in payload.</td><td style="${tdBase};text-align:center;vertical-align:middle;font-size:11px;color:#5f6368;max-width:120px;">${escapeHtml(lastMonthNote)}</td></tr>`;
+    } else {
+      for (let i = 0; i < services.length; i++) {
+        const st = services[i];
+        const isTotal = st === '__TOTAL__';
+        const r7 = m7.get(st);
+        const rM = mMtd.get(st);
+        const rowBg = isTotal ? 'background:#d9e2f3;font-weight:600;' : 'background:#fff;';
+        const serviceLabel = st === '__TOTAL__' ? 'Total' : st;
+        const lmCell =
+          i === 0
+            ? `<td rowspan="${rowspanNote}" style="${tdBase};text-align:center;vertical-align:middle;font-size:11px;color:#5f6368;max-width:120px;">${escapeHtml(lastMonthNote)}</td>`
+            : '';
+        body += `<tr style="${rowBg}"><td style="${tdBase};text-align:left">${escapeHtml(serviceLabel)}</td>
+        ${opsStartedCell(r7)}
+        ${opsActiveFinishedCell('active', st, r7)}
+        ${opsActiveFinishedCell('finished', st, r7)}
+        ${opsStartedCell(rM)}
+        ${opsActiveFinishedCell('active', st, rM)}
+        ${opsActiveFinishedCell('finished', st, rM)}
+        ${lmCell}</tr>`;
+      }
+    }
+    const headTop = `border:1px solid #bdc3c7;padding:8px 6px;background:#4472c4;color:#fff;font-size:11px;font-weight:600;text-align:center;font-family:${font}`;
+    const headSub = `border:1px solid #bdc3c7;padding:6px 4px;background:#5b7fc7;color:#fff;font-size:10px;font-weight:600;text-align:center;font-family:${font}`;
+    return `${sectionTitle('3', 'Operations Summary')}
+      <p style="font-family:${font};${sub}">Source: operations blob for the <strong>same report date</strong> as this email (<code>operations/${escapeHtml(operationsBlobDateIso)}.json</code> — ${escapeHtml(REPORT_TZ)}).</p>
+      <table role="presentation" width="100%" style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;margin:0 0 12px 0;mso-table-lspace:0pt;mso-table-rspace:0pt;" cellspacing="0" cellpadding="0">
+        <thead>
+          <tr>
+            <th rowspan="2" style="${thLeft}">Service</th>
+            <th colspan="3" style="${headTop}">Last 7 days</th>
+            <th colspan="3" style="${headTop}">Month to date</th>
+            <th rowspan="2" style="${headTop};max-width:130px;">Last month</th>
+          </tr>
+          <tr>
+            <th style="${headSub}">Started</th><th style="${headSub}">Active</th><th style="${headSub}">Finished</th>
+            <th style="${headSub}">Started</th><th style="${headSub}">Active</th><th style="${headSub}">Finished</th>
+          </tr>
+        </thead>
+        <tbody>${body}</tbody>
+      </table>`;
   }
 
   /** Merge complaints from each daily file (same as getAllComplaintsBeforeDate input pool). */
@@ -1480,6 +1647,10 @@
     const todayEvalSummary = evalsByDate.get(reportDate) ?? null;
     const evalsHtml = renderEvalsSection(colToday, reportDate, todayEvalSummary, mtdEvalSummaries);
 
+    const rawOps = await fetchOperationsBlob.call(this, reportDate);
+    const opsDoc = parseOperationsBlobJson(rawOps);
+    const operationsHtml = renderOperationsSummarySection(opsDoc, reportDate);
+
     const complaintFetchStart = maxIsoDate('2018-01-01', addCalendarDays(reportDate, -COMPLAINT_BLOB_LOOKBACK_DAYS));
     const mergedComplaints = await loadMergedComplaintsFromBlobRange.call(this, complaintFetchStart, reportDate);
 
@@ -1503,7 +1674,7 @@
     }
 
     const subject = `PRO Services Daily Report - ${displayDate}`;
-    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>${escapeHtml(subject)}</title></head><body style="margin:0;padding:0;background:#e8eaed;font-family:${font};line-height:1.5;color:#212121;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#e8eaed;width:100%;"><tr><td style="padding:24px 16px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:1200px;margin:0 auto;background:#fff;border-radius:8px;overflow:visible;mso-table-lspace:0pt;mso-table-rspace:0pt;"><tr><td style="background:#4472c4;color:#fff;padding:20px 24px;"><div style="font-size:11px;font-weight:600;letter-spacing:0.5px;opacity:0.9">PRO Services</div><h1 style="margin:8px 0 4px 0;font-size:26px;font-weight:bold;">Daily Report</h1><div style="font-size:14px;opacity:0.95">${escapeHtml(displayDate)}</div></td></tr><tr><td style="padding:24px 24px 32px 24px;width:100%;min-width:100%;">${section1Html}${sectionTitle('2', 'Chat Analysis')}${renderBotCoverage(colToday, botToday, botMtd)}${renderInitiatorComparison(colToday, cT, cM, aT, aM)}${evalsHtml}<div style="margin-top:20px;font-size:10px;color:#5f6368;font-style:italic;">Generated automatically for ${escapeHtml(reportDate)} (${escapeHtml(REPORT_TZ)}).</div></td></tr></table></td></tr></table></body></html>`;
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>${escapeHtml(subject)}</title></head><body style="margin:0;padding:0;background:#e8eaed;font-family:${font};line-height:1.5;color:#212121;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#e8eaed;width:100%;"><tr><td style="padding:24px 16px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:1200px;margin:0 auto;background:#fff;border-radius:8px;overflow:visible;mso-table-lspace:0pt;mso-table-rspace:0pt;"><tr><td style="background:#4472c4;color:#fff;padding:20px 24px;"><div style="font-size:11px;font-weight:600;letter-spacing:0.5px;opacity:0.9">PRO Services</div><h1 style="margin:8px 0 4px 0;font-size:26px;font-weight:bold;">Daily Report</h1><div style="font-size:14px;opacity:0.95">${escapeHtml(displayDate)}</div></td></tr><tr><td style="padding:24px 24px 32px 24px;width:100%;min-width:100%;">${section1Html}${sectionTitle('2', 'Chat Analysis')}${renderBotCoverage(colToday, botToday, botMtd)}${renderInitiatorComparison(colToday, cT, cM, aT, aM)}${evalsHtml}${operationsHtml}<div style="margin-top:20px;font-size:10px;color:#5f6368;font-style:italic;">Generated automatically for ${escapeHtml(reportDate)} (${escapeHtml(REPORT_TZ)}).</div></td></tr></table></td></tr></table></body></html>`;
     const text = [
       'PRO Services',
       'Daily Report',
@@ -1511,6 +1682,7 @@
       '',
       '1. Service Overview — prospects from daily/{date}.json; prior-complaint filter + sales from complaints-daily/*.json (see HTML).',
       '2. Chat Analysis — Bot Coverage, By initiator, and Evals (see HTML table; evals/daily blobs).',
+      '3. Operations Summary — from operations/{date}.json (see HTML).',
       '',
       `Generated for ${reportDate} (${REPORT_TZ}).`,
     ].join('\n');

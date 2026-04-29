@@ -20,6 +20,7 @@ const SERVICE_COLORS = {
   ttlMultiple: '#1e40af', // blue-800 (darkest blue for multiple entry)
   tte: '#ef4444',      // red-500
   ttj: '#8b5cf6',      // violet-500
+  visaSaudi: '#c2410c',
   schengen: '#06b6d4', // cyan-500
   gcc: '#84cc16',      // lime-500
   ethiopianPP: '#f97316', // orange-500
@@ -37,6 +38,7 @@ export default function PnLServiceChart({ data }: PnLServiceChartProps) {
     ttl: 'Lebanon',
     tte: 'Egypt',
     ttj: 'Jordan',
+    visaSaudi: 'Saudi',
     schengen: 'Schengen',
     gcc: 'GCC',
     ethiopianPP: 'Ethiopian PP',

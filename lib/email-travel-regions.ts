@@ -1,18 +1,15 @@
 /** Travel visa rows in the daily email; first matching region wins (same as dashboard allocation intent). */
 
-import {
-  EU_MEMBER_COUNTRY_ALIAS_TOKENS,
-  VISA_SCHENGEN_NON_EU_ALIAS_TOKENS,
-} from '@/lib/eu-member-countries';
+import { SCHENGEN_ALLOWED_COUNTRY_ALIAS_TOKENS } from '@/lib/eu-member-countries';
+
+const SCHENGEN_EMAIL_ALIASES = ['schengen', ...SCHENGEN_ALLOWED_COUNTRY_ALIAS_TOKENS];
 
 export const EMAIL_TRAVEL_REGIONS: { key: string; aliases: string[] }[] = [
   { key: 'Visa Lebanon', aliases: ['lebanon'] },
   { key: 'Visa Egypt', aliases: ['egypt'] },
   { key: 'Visa Jordan', aliases: ['jordan'] },
-  {
-    key: 'Visa Schengen',
-    aliases: [...VISA_SCHENGEN_NON_EU_ALIAS_TOKENS, ...EU_MEMBER_COUNTRY_ALIAS_TOKENS],
-  },
+  { key: 'Visa Saudi', aliases: ['saudi', 'saudi arabia', 'ksa'] },
+  { key: 'Visa Schengen', aliases: [...SCHENGEN_EMAIL_ALIASES] },
 ];
 
 function normalizeCountryToken(s: string): string {

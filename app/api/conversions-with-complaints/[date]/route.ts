@@ -132,7 +132,7 @@ export async function GET(
         prospectService = 'ttl';
       } else if (payment.service === 'tte' || payment.service === 'tteSingle' || payment.service === 'tteDouble' || payment.service === 'tteMultiple') {
         prospectService = 'tte';
-      } else if (payment.service === 'ttj' || payment.service === 'schengen' || payment.service === 'gcc') {
+      } else if (payment.service === 'ttj' || payment.service === 'visaSaudi' || payment.service === 'schengen' || payment.service === 'gcc') {
         prospectService = 'travel_visa';
       } else if (payment.service === 'filipina_pp') {
         prospectService = 'filipina_pp';

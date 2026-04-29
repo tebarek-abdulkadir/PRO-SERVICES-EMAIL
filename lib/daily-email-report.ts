@@ -17,8 +17,10 @@ import {
 import type { EmailSalesCcMvSplit, EnrichedProspectDetail } from '@/lib/prospects-report';
 import { getDashboardProspectsData } from '@/lib/prospects-report';
 import type { ByContractType, Prospects } from '@/lib/types';
+import { getDailyComplaints } from '@/lib/daily-complaints-storage';
+import { applyComplaintSummaryTotalsToRows } from '@/lib/complaints-daily-summary';
 
-/** Report timezone for labels; default calendar day for data is **today** in this zone (see `resolveReportDate`). */
+/** Report timezone for labels; default calendar day for data follows `resolveReportDate` in this zone. */
 const REPORT_DATE_TIMEZONE = process.env.REPORT_DATE_TIMEZONE || 'Africa/Nairobi';
 
 interface DatePayload {
@@ -128,12 +130,18 @@ async function getProspectsAndSalesBlock(
   const mtdDates = mtdDateRange(date);
   const mtdSnapshots = await loadServiceOverviewSnapshots(mtdDates);
   const { rows: periodRows, mtdDaysCounted } = applyPeriodAggregatesToRows(rows, mtdSnapshots, []);
-  const totalsRow = computeExtendedTotalsRow(periodRows, mtdSnapshots, []);
+  const complaintsRes = await getDailyComplaints(date);
+  const summary =
+    complaintsRes.success && complaintsRes.data?.summary?.length
+      ? complaintsRes.data.summary
+      : null;
+  const rowsWithTotals = applyComplaintSummaryTotalsToRows(periodRows, summary);
+  const totalsRow = computeExtendedTotalsRow(rowsWithTotals, mtdSnapshots, []);
 
   return {
     columnLabelShort,
     prospects: {
-      rows: periodRows,
+      rows: rowsWithTotals,
       totalsRow,
       mtdDaysCounted,
       total: totalProspects,
@@ -219,8 +227,8 @@ export function resolveReportDate(searchParams: URLSearchParams, now = new Date(
     return overrideDate;
   }
 
-  /** Default: today in REPORT_DATE_TIMEZONE (daily row + MTD + trends through this calendar day). */
-  return getDateInTimeZone(now, REPORT_DATE_TIMEZONE);
+  /** Default: completed prior calendar day in REPORT_DATE_TIMEZONE (same anchor as n8n "yesterday" report). */
+  return getPreviousDate(getDateInTimeZone(now, REPORT_DATE_TIMEZONE));
 }
 
 export function isDryRun(searchParams: URLSearchParams): boolean {

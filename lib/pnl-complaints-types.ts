@@ -1,5 +1,7 @@
 // Types for P&L Complaints data ingestion and processing
 
+import { SCHENGEN_ALLOWED_COUNTRY_ALIAS_TOKENS } from '@/lib/eu-member-countries';
+
 // Service keys that map to P&L services
 export type PnLServiceKey = 
   | 'oec' 
@@ -13,6 +15,7 @@ export type PnLServiceKey =
   | 'tteDouble'    // Tourist Visa to Egypt – Double Entry
   | 'tteMultiple'  // Tourist Visa to Egypt – Multiple Entry
   | 'ttj' 
+  | 'visaSaudi'
   | 'schengen' 
   | 'gcc' 
   | 'ethiopianPP' 
@@ -140,16 +143,22 @@ export const COMPLAINT_TYPE_MAP: Record<string, PnLServiceKey> = {
   'good conduct certificate': 'gcc',
   'good conduct': 'gcc',
   
-  // Schengen - includes country-specific variants
-  'schengen': 'schengen',
-  'schengen visa': 'schengen',
+  // Schengen — only allowed destinations (see SCHENGEN_ALLOWED_COUNTRY_ALIAS_TOKENS)
   'schengen visa to france': 'schengen',
   'schengen visa to germany': 'schengen',
   'schengen visa to italy': 'schengen',
   'schengen visa to spain': 'schengen',
-  'schengen visa to netherlands': 'schengen',
-  'schengen to france': 'schengen',
-  'schengen to germany': 'schengen',
+  'schengen visa to switzerland': 'schengen',
+  'schengen visa to croatia': 'schengen',
+  'schengen visa to greece': 'schengen',
+  'schengen visa to portugal': 'schengen',
+  'schengen visa to bulgaria': 'schengen',
+  'schengen visa to latvia': 'schengen',
+  // Saudi travel visas
+  'tourist visa to saudi': 'visaSaudi',
+  'tourist visa to saudi arabia': 'visaSaudi',
+  'visa to saudi': 'visaSaudi',
+  'visa to saudi arabia': 'visaSaudi',
 };
 
 // Service display names
@@ -165,6 +174,7 @@ export const SERVICE_NAMES: Record<PnLServiceKey, string> = {
   tteDouble: 'Tourist Visa to Egypt – Double Entry',
   tteMultiple: 'Tourist Visa to Egypt – Multiple Entry',
   ttj: 'Travel to Jordan',
+  visaSaudi: 'Visa Saudi',
   schengen: 'Schengen Countries',
   gcc: 'GCC',
   ethiopianPP: 'Ethiopian Passport Renewal',
@@ -184,6 +194,7 @@ export const ALL_SERVICE_KEYS: PnLServiceKey[] = [
   'tteDouble',
   'tteMultiple',
   'ttj',
+  'visaSaudi',
   'schengen',
   'gcc',
   'ethiopianPP',
@@ -220,9 +231,20 @@ export function getServiceKeyFromComplaintType(complaintType: string): PnLServic
     return 'owwa';
   }
   
-  // Schengen (check before specific countries)
+  // Saudi travel (before GCC / generic schengen)
+  if (
+    (normalized.includes('saudi') || normalized.includes('ksa')) &&
+    (normalized.includes('visa') || normalized.includes('tourist') || normalized.includes('travel'))
+  ) {
+    return 'visaSaudi';
+  }
+
+  // Schengen — only listed destinations (not Netherlands, Turkey, etc.)
   if (normalized.includes('schengen')) {
-    return 'schengen';
+    if (SCHENGEN_ALLOWED_COUNTRY_ALIAS_TOKENS.some((t) => normalized.includes(t))) {
+      return 'schengen';
+    }
+    return undefined;
   }
   
   // Travel Visas - Lebanon (check specific entry types first)

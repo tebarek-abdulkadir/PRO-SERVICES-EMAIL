@@ -76,7 +76,7 @@ function enrichProspectsWithComplaintStatus(
           convertedServices.push('OEC');
         } else if (serviceKey === 'owwa' && prospect.isOWWAProspect && !convertedServices.includes('OWWA')) {
           convertedServices.push('OWWA');
-        } else if (['ttl', 'ttlSingle', 'ttlDouble', 'ttlMultiple', 'tte', 'tteSingle', 'tteDouble', 'tteMultiple', 'ttj', 'schengen', 'gcc'].includes(serviceKey) && prospect.isTravelVisaProspect && !convertedServices.includes('Travel Visa')) {
+        } else if (['ttl', 'ttlSingle', 'ttlDouble', 'ttlMultiple', 'tte', 'tteSingle', 'tteDouble', 'tteMultiple', 'ttj', 'visaSaudi', 'schengen', 'gcc'].includes(serviceKey) && prospect.isTravelVisaProspect && !convertedServices.includes('Travel Visa')) {
           convertedServices.push('Travel Visa');
         } else if (serviceKey === 'filipinaPP' && prospect.isFilipinaPassportRenewalProspect && !convertedServices.includes('Filipina PP')) {
           convertedServices.push('Filipina PP');
@@ -141,7 +141,7 @@ async function calculateConversionsForDate(date: string, prospects: any[]) {
             conversions.oec.add(prospectKey);
           } else if (serviceKey === 'owwa' && prospect.isOWWAProspect) {
             conversions.owwa.add(prospectKey);
-          } else if (['ttl', 'ttlSingle', 'ttlDouble', 'ttlMultiple', 'tte', 'tteSingle', 'tteDouble', 'tteMultiple', 'ttj', 'schengen', 'gcc'].includes(serviceKey) && prospect.isTravelVisaProspect) {
+          } else if (['ttl', 'ttlSingle', 'ttlDouble', 'ttlMultiple', 'tte', 'tteSingle', 'tteDouble', 'tteMultiple', 'ttj', 'visaSaudi', 'schengen', 'gcc'].includes(serviceKey) && prospect.isTravelVisaProspect) {
             conversions.travelVisa.add(prospectKey);
           } else if (serviceKey === 'filipinaPP' && prospect.isFilipinaPassportRenewalProspect) {
             conversions.filipinaPassportRenewal.add(prospectKey);

@@ -1,4 +1,5 @@
 import { put, list } from '@vercel/blob';
+import type { ComplaintsDailySummaryRow } from './complaints-daily-summary';
 import type { PnLComplaint, PnLServiceKey } from './pnl-complaints-types';
 import { getServiceKeyFromComplaintType } from './pnl-complaints-types';
 
@@ -9,6 +10,8 @@ export interface DailyComplaintsData {
   lastUpdated: string;
   complaints: PnLComplaint[];
   totalComplaints: number;
+  /** Optional aggregates (YESTERDAY / THIS_MONTH / LAST_MONTH per complaint type). */
+  summary?: ComplaintsDailySummaryRow[];
 }
 
 /**
@@ -17,7 +20,8 @@ export interface DailyComplaintsData {
 export async function storeDailyComplaints(
   date: string,
   complaints: PnLComplaint[],
-  mergeWithExisting: boolean = true
+  mergeWithExisting: boolean = true,
+  summary?: ComplaintsDailySummaryRow[] | null
 ): Promise<{
   success: boolean;
   message: string;
@@ -36,39 +40,52 @@ export async function storeDailyComplaints(
       };
     }
 
-    if (!complaints || !Array.isArray(complaints) || complaints.length === 0) {
+    const complaintsInput = Array.isArray(complaints) ? complaints : [];
+    let existingData: DailyComplaintsData | null = null;
+    if (mergeWithExisting) {
+      try {
+        const existing = await getDailyComplaints(date);
+        if (existing.success && existing.data) {
+          existingData = existing.data;
+        }
+      } catch {
+        console.log(`No existing blob for ${date}`);
+      }
+    }
+
+    const summaryProvided = summary !== undefined && summary !== null;
+    const hasIncomingComplaints = complaintsInput.length > 0;
+    if (!hasIncomingComplaints && !summaryProvided && !existingData) {
       return {
         success: false,
-        error: 'complaints array is required and must not be empty',
+        error: 'Provide complaints and/or summary, or merge with an existing blob',
         message: 'Failed to store complaints data',
       };
     }
 
-    // If merging, fetch existing complaints first
-    let finalComplaints = complaints;
-    if (mergeWithExisting) {
-      try {
-        const existing = await getDailyComplaints(date);
-        if (existing.success && existing.data && existing.data.complaints.length > 0) {
-          // Merge: combine existing with new, avoiding duplicates based on contractId + housemaidId + clientId + complaintType + creationDate
-          const existingMap = new Map<string, PnLComplaint>();
-          existing.data.complaints.forEach(c => {
-            const key = `${c.contractId}_${c.housemaidId}_${c.clientId}_${c.complaintType}_${c.creationDate}`;
-            existingMap.set(key, c);
-          });
-          
-          // Add new complaints (will overwrite duplicates)
-          complaints.forEach(c => {
-            const key = `${c.contractId}_${c.housemaidId}_${c.clientId}_${c.complaintType}_${c.creationDate}`;
-            existingMap.set(key, c);
-          });
-          
-          finalComplaints = Array.from(existingMap.values());
-        }
-      } catch (error) {
-        // If fetch fails (e.g., no existing data), just use new complaints
-        console.log(`No existing data found for ${date}, storing new complaints only`);
+    let finalComplaints = complaintsInput;
+    if (mergeWithExisting && existingData) {
+      if (complaintsInput.length === 0) {
+        finalComplaints = existingData.complaints || [];
+      } else if ((existingData.complaints || []).length > 0) {
+        const existingMap = new Map<string, PnLComplaint>();
+        (existingData.complaints || []).forEach((c) => {
+          const key = `${c.contractId}_${c.housemaidId}_${c.clientId}_${c.complaintType}_${c.creationDate}`;
+          existingMap.set(key, c);
+        });
+        complaintsInput.forEach((c) => {
+          const key = `${c.contractId}_${c.housemaidId}_${c.clientId}_${c.complaintType}_${c.creationDate}`;
+          existingMap.set(key, c);
+        });
+        finalComplaints = Array.from(existingMap.values());
       }
+    }
+
+    let finalSummary: ComplaintsDailySummaryRow[] | undefined;
+    if (summaryProvided && Array.isArray(summary)) {
+      finalSummary = summary;
+    } else if (mergeWithExisting && existingData?.summary) {
+      finalSummary = existingData.summary;
     }
 
     const dailyData: DailyComplaintsData = {
@@ -77,6 +94,9 @@ export async function storeDailyComplaints(
       complaints: finalComplaints,
       totalComplaints: finalComplaints.length,
     };
+    if (finalSummary !== undefined) {
+      dailyData.summary = finalSummary;
+    }
 
     // Store in blob with date-based key
     const blobKey = `${BLOB_PREFIX}${date}.json`;
@@ -88,16 +108,17 @@ export async function storeDailyComplaints(
     });
 
     console.log(`✅ Stored complaints for ${date}:`, {
-      totalComplaints: complaints.length,
+      totalComplaints: finalComplaints.length,
+      summaryRows: finalSummary?.length ?? 0,
       blobUrl: blob.url,
     });
 
     return {
       success: true,
-      message: `Successfully stored ${complaints.length} complaints for ${date}`,
+      message: `Successfully stored data for ${date}`,
       data: {
         date,
-        complaintsCount: complaints.length,
+        complaintsCount: finalComplaints.length,
       },
     };
   } catch (error) {
@@ -140,7 +161,13 @@ export async function getDailyComplaints(date: string): Promise<{
       };
     }
 
-    const data: DailyComplaintsData = await response.json();
+    const raw = await response.json();
+    const data: DailyComplaintsData = {
+      ...raw,
+      complaints: Array.isArray(raw.complaints) ? raw.complaints : [],
+      totalComplaints: typeof raw.totalComplaints === 'number' ? raw.totalComplaints : (raw.complaints?.length ?? 0),
+      summary: Array.isArray(raw.summary) ? raw.summary : undefined,
+    };
 
     return {
       success: true,
@@ -287,6 +314,7 @@ export async function aggregateDailyComplaints(
       tteDouble: 0,
       tteMultiple: 0,
       ttj: 0,
+      visaSaudi: 0,
       schengen: 0,
       gcc: 0,
       ethiopianPP: 0,
@@ -305,6 +333,7 @@ export async function aggregateDailyComplaints(
       tteDouble: [],
       tteMultiple: [],
       ttj: [],
+      visaSaudi: [],
       schengen: [],
       gcc: [],
       ethiopianPP: [],

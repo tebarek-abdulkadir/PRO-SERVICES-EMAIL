@@ -1,59 +1,23 @@
 /**
- * EU member states (27) — English names / common variants for matching CRM country strings.
- * Used to roll prospect counts and sales into the email "Visa Schengen" row together with legacy tokens.
+ * Schengen bucket for dashboard / email: only these destination tokens (country labels + complaint types).
+ * Aligned with stakeholder list: France, Germany, Spain, Switzerland, Croatia, Italy, Greece, Portugal, Bulgaria, Latvia.
  */
 
 function norm(s: string): string {
   return s.trim().toLowerCase();
 }
 
-/** Substrings or full keys matched against normalized country labels (same idea as `matchAliases` in email-report-layout). */
-export const EU_MEMBER_COUNTRY_ALIAS_TOKENS: readonly string[] = [
-  'austria',
-  'belgium',
-  'bulgaria',
-  'croatia',
-  'cyprus',
-  'czech republic',
-  'czechia',
-  'czech',
-  'denmark',
-  'estonia',
-  'finland',
+export const SCHENGEN_ALLOWED_COUNTRY_ALIAS_TOKENS: readonly string[] = [
   'france',
   'germany',
-  'greece',
-  'hungary',
-  'ireland',
-  'italy',
-  'latvia',
-  'lithuania',
-  'luxembourg',
-  'malta',
-  'netherlands',
-  'holland',
-  'poland',
-  'portugal',
-  'romania',
-  'slovakia',
-  'slovenia',
   'spain',
-  'sweden',
-];
-
-/** Non-EU labels that still map to the same email / dashboard "Visa Schengen" product row (legacy behavior). */
-export const VISA_SCHENGEN_NON_EU_ALIAS_TOKENS: readonly string[] = [
-  'schengen',
-  'turkey',
-  'türkiye',
-  'turkiye',
-  'golden visa',
-  'golden',
-  'family visa',
-  'family',
-  'gcc',
-  'g.c.c',
-  'gulf',
+  'switzerland',
+  'croatia',
+  'italy',
+  'greece',
+  'portugal',
+  'bulgaria',
+  'latvia',
 ];
 
 function tokenMatchesKey(keyNorm: string, token: string): boolean {
@@ -66,12 +30,10 @@ function tokenMatchesKey(keyNorm: string, token: string): boolean {
 export function countryKeyCountsAsVisaSchengen(key: string): boolean {
   const k = norm(key);
   if (!k || k === 'unspecified') return false;
-  for (const token of VISA_SCHENGEN_NON_EU_ALIAS_TOKENS) {
+  for (const token of SCHENGEN_ALLOWED_COUNTRY_ALIAS_TOKENS) {
     if (tokenMatchesKey(k, token)) return true;
   }
-  for (const token of EU_MEMBER_COUNTRY_ALIAS_TOKENS) {
-    if (tokenMatchesKey(k, token)) return true;
-  }
+  if (tokenMatchesKey(k, 'schengen')) return true;
   return false;
 }
 
@@ -81,13 +43,10 @@ export function travelVisaCountryLabelCountsAsVisaSchengen(label: string): boole
 }
 
 /**
- * For `buildSalesEmailRows` Schengen count: EU + schengen/turkey tokens only.
- * (Golden / family / GCC use their own rows in the same allocation order.)
+ * For `buildSalesEmailRows` Schengen count: allowed destinations + literal "schengen" token only.
+ * (Golden / family / GCC / Saudi use their own rows in the allocation order.)
  */
 export const VISA_SCHENGEN_SALES_EMAIL_ROW_ALIASES: readonly string[] = [
   'schengen',
-  'turkey',
-  'türkiye',
-  'turkiye',
-  ...EU_MEMBER_COUNTRY_ALIAS_TOKENS,
+  ...SCHENGEN_ALLOWED_COUNTRY_ALIAS_TOKENS,
 ];

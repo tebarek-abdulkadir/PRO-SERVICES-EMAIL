@@ -1,5 +1,9 @@
 import { getAllComplaintsBeforeDate, filterProspectsWithoutPreviousComplaints } from '@/lib/complaints-conversion-service';
-import { EMAIL_TRAVEL_REGIONS, resolveEmailTravelRegionKey } from '@/lib/email-travel-regions';
+import {
+  EMAIL_TRAVEL_REGIONS,
+  prospectCountriesMatchRegions,
+  resolveEmailTravelRegionKey,
+} from '@/lib/email-travel-regions';
 import { getServiceKeyFromComplaintType } from '@/lib/pnl-complaints-types';
 import type { ByContractType, Conversions, Prospects } from '@/lib/types';
 import { getDailyData, getLatestRun, getProspectDetailsByDate, getProspectsGroupedByHousehold } from '@/lib/unified-storage';
@@ -14,6 +18,7 @@ const TRAVEL_COMPLAINT_SERVICE_KEYS = new Set([
   'tteDouble',
   'tteMultiple',
   'ttj',
+  'visaSaudi',
   'schengen',
   'gcc',
 ]);
@@ -331,6 +336,12 @@ function computeEmailSalesCcMvSplit(
         TRAVEL_COMPLAINT_SERVICE_KEYS.has(serviceKey) &&
         prospect.isTravelVisaProspect
       ) {
+        if (
+          serviceKey === 'visaSaudi' &&
+          !prospectCountriesMatchRegions(prospect.travelVisaCountries, ['saudi', 'saudi arabia', 'ksa'])
+        ) {
+          continue;
+        }
         const region = resolveEmailTravelRegionKey(prospect.travelVisaCountries);
         const ts = region ? travelSets[region] : undefined;
         if (ts) {

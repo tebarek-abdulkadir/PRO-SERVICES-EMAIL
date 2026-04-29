@@ -70,6 +70,7 @@ export interface PnLData {
     tteDouble: ServicePnL;
     tteMultiple: ServicePnL;
     ttj: ServicePnL;
+    visaSaudi: ServicePnL;
     schengen: ServicePnL;
     gcc: ServicePnL;
     ethiopianPP: ServicePnL;
@@ -96,6 +97,7 @@ export interface AggregatedPnL {
     tteDouble: ServicePnL;
     tteMultiple: ServicePnL;
     ttj: ServicePnL;
+    visaSaudi: ServicePnL;
     schengen: ServicePnL;
     gcc: ServicePnL;
     ethiopianPP: ServicePnL;

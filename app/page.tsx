@@ -27,7 +27,9 @@ import type { AggregatedPnL } from '@/lib/pnl-types';
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [dashboardSubTab, setDashboardSubTab] = useState<'overview' | 'oec' | 'owwa' | 'travelVisa' | 'passportRenewal'>('overview');
-  const [pnlSubTab, setPnlSubTab] = useState<'overview' | 'oec' | 'owwa' | 'ttl' | 'tte' | 'ttj' | 'schengen' | 'gcc' | 'ethiopianPP' | 'filipinaPP'>('overview');
+  const [pnlSubTab, setPnlSubTab] = useState<
+    'overview' | 'oec' | 'owwa' | 'ttl' | 'tte' | 'ttj' | 'visaSaudi' | 'schengen' | 'gcc' | 'ethiopianPP' | 'filipinaPP'
+  >('overview');
   const [results, setResults] = useState<Results | null>(null);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -573,6 +575,7 @@ export default function Dashboard() {
                     { id: 'ttl', label: 'TTL' },
                     { id: 'tte', label: 'TTE' },
                     { id: 'ttj', label: 'TTJ' },
+                    { id: 'visaSaudi', label: 'Visa Saudi' },
                     { id: 'schengen', label: 'Schengen' },
                     { id: 'gcc', label: 'GCC' },
                     { id: 'ethiopianPP', label: 'Ethiopian PP' },
@@ -668,6 +671,9 @@ export default function Dashboard() {
             )}
             {pnlSubTab === 'ttj' && (
               <PnLServiceDetail data={pnlData} filter="ttj" />
+            )}
+            {pnlSubTab === 'visaSaudi' && (
+              <PnLServiceDetail data={pnlData} filter="visaSaudi" />
             )}
             {pnlSubTab === 'schengen' && (
               <PnLServiceDetail data={pnlData} filter="schengen" />

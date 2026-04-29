@@ -46,6 +46,7 @@ const CSAT_SERVICE_ROWS = [
   'Visa Lebanon',
   'Visa Egypt',
   'Visa Jordan',
+  'Visa Saudi',
   'Visa Schengen',
   'Passport Filipina',
   'Passport Ethiopian',
@@ -71,6 +72,9 @@ function serviceDataCells(row: ServiceOverviewRow, bold = false): string {
           <td style="${s}">${row.salesMtdMv}</td>
           <td style="${s}">${escapeHtml(row.conversionRate)}</td>
           <td style="${s}">${escapeHtml(row.conversionRateMtd)}</td>
+          <td style="${s}">${row.totalSalesYesterday}</td>
+          <td style="${s}">${row.totalSalesThisMonth}</td>
+          <td style="${s}">${row.totalSalesLastMonth}</td>
           ${lmMergedPendingCell(bold)}`;
 }
 
@@ -91,13 +95,14 @@ function renderServiceOverviewTable(
     .join('');
 
   return `
-    <table role="presentation" width="100%" style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:780px;margin:0 0 24px 0;mso-table-lspace:0pt;mso-table-rspace:0pt;table-layout:fixed;" cellspacing="0" cellpadding="0">
+    <table role="presentation" width="100%" style="border:1px solid #bdc3c7;border-collapse:collapse;width:100%;min-width:920px;margin:0 0 24px 0;mso-table-lspace:0pt;mso-table-rspace:0pt;table-layout:fixed;" cellspacing="0" cellpadding="0">
       <thead>
         <tr>
           <th style="${thLeft}" rowspan="3">Service Type</th>
           <th style="${thStyle}" colspan="4">Prospect</th>
-          <th style="${thStyle}" colspan="4">Sales</th>
+          <th style="${thStyle}" colspan="4">Sales out of tracked prospects</th>
           <th style="${thStyle}" colspan="2">Conversion</th>
+          <th style="${thStyle}" colspan="3">Total sales (complaints daily)</th>
           <th style="${thStyle};font-size:10px;line-height:1.25;max-width:108px;width:108px" colspan="5" rowspan="3">LM (last month)</th>
         </tr>
         <tr>
@@ -107,6 +112,9 @@ function renderServiceOverviewTable(
           <th style="${thStyle}" colspan="2">MTD total</th>
           <th style="${thStyle}" rowspan="2">Daily</th>
           <th style="${thStyle}" rowspan="2">MTD</th>
+          <th style="${thStyle}" rowspan="2">Yesterday</th>
+          <th style="${thStyle}" rowspan="2">MTD</th>
+          <th style="${thStyle}" rowspan="2">Last month</th>
         </tr>
         <tr>
           <th style="${thStyle}">CC</th>
@@ -129,7 +137,7 @@ function renderServiceOverviewTable(
     </table>
     ${
       periodNote
-        ? `<div style="font-size:10px;color:#757575;margin:8px 0 0 0;line-height:1.35;">MTD total columns sum each saved day from the 1st of the report month through the report date (${periodNote.mtdDaysCounted} day(s) with snapshots; missing days are skipped). LM (last month) columns show <strong>${escapeHtml(MTD_PENDING_LABEL)}</strong> until that access is available.</div>`
+        ? `<div style="font-size:10px;color:#757575;margin:8px 0 0 0;line-height:1.35;">MTD total columns sum each saved day from the 1st of the report month through the report date (${periodNote.mtdDaysCounted} day(s) with snapshots; missing days are skipped). <strong>Total sales</strong> uses <code>complaints-daily/{report-date}.json</code> <code>summary</code> (THIS_MONTH / LAST_MONTH as provided by the pipeline). LM (last month) columns show <strong>${escapeHtml(MTD_PENDING_LABEL)}</strong> until that access is available.</div>`
         : ''
     }`;
 }

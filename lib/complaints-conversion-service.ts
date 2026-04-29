@@ -45,6 +45,7 @@ const COMPLAINT_SERVICE_MAP: Record<PnLServiceKey, keyof ConversionWithComplaint
   tteDouble: 'tte',
   tteMultiple: 'tte',
   ttj: 'travelVisa',
+  visaSaudi: 'travelVisa',
   schengen: 'travelVisa',
   gcc: 'travelVisa',
   filipinaPP: 'filipinaPassportRenewal',
@@ -262,7 +263,7 @@ export async function checkProspectHasComplaints(
       serviceKeysToCheck = ['tte', 'tteSingle', 'tteDouble', 'tteMultiple'];
       break;
     case 'travelVisa':
-      serviceKeysToCheck = ['ttj', 'schengen', 'gcc'];
+      serviceKeysToCheck = ['ttj', 'visaSaudi', 'schengen', 'gcc'];
       break;
     case 'filipinaPassportRenewal':
       serviceKeysToCheck = ['filipinaPP'];
@@ -345,7 +346,7 @@ export async function getConversionsWithComplaintCheck(
       // For other countries or general travel visa prospects
       if (!prospect.travelVisaCountries || prospect.travelVisaCountries.length === 0 || 
           prospect.travelVisaCountries.some(country => !['Lebanon', 'Egypt', 'Jordan'].includes(country))) {
-        servicesToCheck.push('schengen', 'gcc');
+        servicesToCheck.push('visaSaudi', 'schengen', 'gcc');
       }
     }
     if (prospect.isFilipinaPassportRenewalProspect) servicesToCheck.push('filipinaPP');
@@ -394,10 +395,10 @@ export async function getConversionsWithComplaintCheck(
         },
         travelVisa: { 
           converted: false, 
-          hasComplaint: ['ttj', 'schengen', 'gcc'].some(key => 
+          hasComplaint: ['ttj', 'visaSaudi', 'schengen', 'gcc'].some(key => 
             complaintChecks[key as PnLServiceKey]?.hasComplaint
           ),
-          complaintTypes: ['ttj', 'schengen', 'gcc'].flatMap(key => 
+          complaintTypes: ['ttj', 'visaSaudi', 'schengen', 'gcc'].flatMap(key => 
             complaintChecks[key as PnLServiceKey]?.complaintTypes || []
           )
         },

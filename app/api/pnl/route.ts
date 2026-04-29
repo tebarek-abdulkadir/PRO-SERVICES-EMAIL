@@ -31,6 +31,7 @@ const OLD_SERVICE_COSTS: Record<PnLServiceKey, number> = {
   tteDouble: 520,
   tteMultiple: 470,  // Old price
   ttj: 320,          // Old price
+  visaSaudi: 320,
   schengen: 0,
   gcc: 220,
   ethiopianPP: 1330,
@@ -49,6 +50,7 @@ const OLD_SERVICE_FEES: Record<PnLServiceKey, number> = {
   tteDouble: 0,
   tteMultiple: 0,
   ttj: 0,
+  visaSaudi: 0,
   schengen: 0,
   gcc: 0,
   ethiopianPP: 0,
@@ -68,6 +70,7 @@ const NEW_SERVICE_COSTS: Record<PnLServiceKey, number> = {
   tteDouble: 520,
   tteMultiple: 470,  // Updated Feb 22
   ttj: 320,          // Updated Feb 22
+  visaSaudi: 320,
   schengen: 0,
   gcc: 220,
   ethiopianPP: 1330,
@@ -86,6 +89,7 @@ const NEW_SERVICE_FEES: Record<PnLServiceKey, number> = {
   tteDouble: 0,
   tteMultiple: 100,  // Updated Feb 22
   ttj: 100,          // Updated Feb 22
+  visaSaudi: 100,
   schengen: 100,
   gcc: 0,
   ethiopianPP: 120,  // Updated Feb 22
@@ -187,6 +191,7 @@ export async function GET(request: Request) {
         tteDouble: 'Tourist Visa to Egypt – Double Entry',
         tteMultiple: 'Tourist Visa to Egypt – Multiple Entry',
         ttj: 'Travel to Jordan',
+        visaSaudi: 'Visa Saudi',
         schengen: 'Schengen Countries',
         gcc: 'GCC',
         ethiopianPP: 'Ethiopian Passport Renewal',

@@ -333,11 +333,17 @@ export function computeExtendedTotalsRow(
   let lmProspectTotalMv = 0;
   let lmSalesTotalCc = 0;
   let lmSalesTotalMv = 0;
+  let totalSalesYesterday = 0;
+  let totalSalesThisMonth = 0;
+  let totalSalesLastMonth = 0;
   for (const r of rows) {
     lmProspectTotalCc += r.lmProspectTotalCc;
     lmProspectTotalMv += r.lmProspectTotalMv;
     lmSalesTotalCc += r.lmSalesTotalCc;
     lmSalesTotalMv += r.lmSalesTotalMv;
+    totalSalesYesterday += r.totalSalesYesterday;
+    totalSalesThisMonth += r.totalSalesThisMonth;
+    totalSalesLastMonth += r.totalSalesLastMonth;
   }
 
   return {
@@ -365,5 +371,8 @@ export function computeExtendedTotalsRow(
     lmSalesTotalCc,
     lmSalesTotalMv,
     lmConversionRate,
+    totalSalesYesterday,
+    totalSalesThisMonth,
+    totalSalesLastMonth,
   };
 }

@@ -51,6 +51,10 @@ export interface ServiceOverviewRow {
   lmSalesTotalCc: number;
   lmSalesTotalMv: number;
   lmConversionRate: string;
+  /** From complaints-daily `summary` for the report day (not CC/MV split). */
+  totalSalesYesterday: number;
+  totalSalesThisMonth: number;
+  totalSalesLastMonth: number;
 }
 
 /** Canonical order for the eight service-overview products (matches `buildServiceOverviewRows`). */
@@ -60,6 +64,7 @@ export const SERVICE_OVERVIEW_PRODUCT_LABELS: readonly string[] = [
   'Visa Lebanon',
   'Visa Egypt',
   'Visa Jordan',
+  'Visa Saudi',
   'Visa Schengen',
   'Passport Filipina',
   'Passport Ethiopian',
@@ -130,6 +135,9 @@ function serviceOverviewRow(
     lmSalesTotalCc: 0,
     lmSalesTotalMv: 0,
     lmConversionRate: '0%',
+    totalSalesYesterday: 0,
+    totalSalesThisMonth: 0,
+    totalSalesLastMonth: 0,
   };
 }
 
@@ -148,7 +156,8 @@ export function buildServiceOverviewRows(
   const pEgyptCc = countryCountsMatching(cc, [(k) => matchAliases(k, ['egypt'])]);
   const pJordanMv = countryCountsMatching(mv, [(k) => matchAliases(k, ['jordan'])]);
   const pJordanCc = countryCountsMatching(cc, [(k) => matchAliases(k, ['jordan'])]);
-  /** EU members + legacy Schengen-area tokens — aligned with `EMAIL_TRAVEL_REGIONS` / sales split. */
+  const pSaudiMv = countryCountsMatching(mv, [(k) => matchAliases(k, ['saudi', 'saudi arabia', 'ksa'])]);
+  const pSaudiCc = countryCountsMatching(cc, [(k) => matchAliases(k, ['saudi', 'saudi arabia', 'ksa'])]);
   const pSchengenMv = countryCountsMatching(mv, [(k) => countryKeyCountsAsVisaSchengen(k)]);
   const pSchengenCc = countryCountsMatching(cc, [(k) => countryKeyCountsAsVisaSchengen(k)]);
 
@@ -196,6 +205,13 @@ export function buildServiceOverviewRows(
       visa('Visa Jordan').mv
     ),
     serviceOverviewRow(
+      'Visa Saudi',
+      pSaudiCc,
+      pSaudiMv,
+      visa('Visa Saudi').cc,
+      visa('Visa Saudi').mv
+    ),
+    serviceOverviewRow(
       'Visa Schengen',
       pSchengenCc,
       pSchengenMv,
@@ -241,6 +257,7 @@ export function buildSalesEmailRows(details: EnrichedProspectDetail[]): EmailRep
     { label: 'Visa to Lebanon', aliases: ['lebanon'] },
     { label: 'Visa to Egypt', aliases: ['egypt'] },
     { label: 'Travel to Jordan', aliases: ['jordan'] },
+    { label: 'Visa to Saudi', aliases: ['saudi', 'saudi arabia', 'ksa'] },
     { label: 'Schengen', aliases: [...VISA_SCHENGEN_SALES_EMAIL_ROW_ALIASES] },
     { label: 'Golden Visa', aliases: ['golden visa', 'golden'] },
     { label: 'Family Visa', aliases: ['family visa', 'family'] },
@@ -280,7 +297,7 @@ export function buildSalesEmailRows(details: EnrichedProspectDetail[]): EmailRep
         (p) => p.isOWWAProspect && p.convertedServices.includes('OWWA')
       ).length,
     },
-    ...travelAllocationOrder.slice(0, 6).map(({ label }) => ({
+    ...travelAllocationOrder.slice(0, -1).map(({ label }) => ({
       label,
       count: travelCounts.get(label) || 0,
     })),

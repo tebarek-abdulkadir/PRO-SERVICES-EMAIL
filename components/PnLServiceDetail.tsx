@@ -3,7 +3,7 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 import type { AggregatedPnL, ServicePnL, EntryType, CostBreakdown } from '@/lib/pnl-types';
 
-type PnLServiceFilter = 'oec' | 'owwa' | 'ttl' | 'tte' | 'ttj' | 'schengen' | 'gcc' | 'ethiopianPP' | 'filipinaPP' | 'travel' | 'passport';
+type PnLServiceFilter = 'oec' | 'owwa' | 'ttl' | 'tte' | 'ttj' | 'visaSaudi' | 'schengen' | 'gcc' | 'ethiopianPP' | 'filipinaPP' | 'travel' | 'passport';
 
 interface PnLServiceDetailProps {
   data: AggregatedPnL | null;
@@ -23,6 +23,7 @@ const SERVICE_COLORS = {
   tteDouble: '#dc2626',   // red-600 (distinct red for double entry)
   tteMultiple: '#7c3aed', // violet-600 (distinct purple for multiple entry)
   ttj: '#e5a855',      // warm amber
+  visaSaudi: '#c2410c',
   schengen: '#8ecae6', // soft sky blue
   gcc: '#e5c07b',      // soft golden
   ethiopianPP: '#a78bfa', // violet-400
@@ -41,6 +42,7 @@ const SERVICE_LABELS: Record<string, string> = {
   tteDouble: 'TTE - Double Entry',
   tteMultiple: 'TTE - Multiple Entry',
   ttj: 'Travel to Jordan',
+  visaSaudi: 'Visa Saudi',
   schengen: 'Schengen Countries',
   gcc: 'GCC',
   ethiopianPP: 'Ethiopian Passport Renewal',
@@ -94,6 +96,8 @@ export default function PnLServiceDetail({ data, filter }: PnLServiceDetailProps
         return tteServices;
       case 'ttj':
         return [{ key: 'ttj', service: data.services.ttj }];
+      case 'visaSaudi':
+        return [{ key: 'visaSaudi', service: data.services.visaSaudi }];
       case 'schengen':
         return [{ key: 'schengen', service: data.services.schengen }];
       case 'gcc':
@@ -108,6 +112,7 @@ export default function PnLServiceDetail({ data, filter }: PnLServiceDetailProps
           { key: 'ttl', service: data.services.ttl },
           { key: 'tte', service: data.services.tte },
           { key: 'ttj', service: data.services.ttj },
+          { key: 'visaSaudi', service: data.services.visaSaudi },
           { key: 'schengen', service: data.services.schengen },
           { key: 'gcc', service: data.services.gcc },
         ];
@@ -209,6 +214,7 @@ export default function PnLServiceDetail({ data, filter }: PnLServiceDetailProps
     ttl: 'Travel to Lebanon',
     tte: 'Travel to Egypt',
     ttj: 'Travel to Jordan',
+    visaSaudi: 'Visa Saudi',
     schengen: 'Schengen Countries',
     gcc: 'GCC',
     ethiopianPP: 'Ethiopian Passport Renewal',

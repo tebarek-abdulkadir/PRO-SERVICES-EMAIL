@@ -13,6 +13,7 @@ const SERVICE_COLORS: Record<string, string> = {
   ttl: '#2563eb',      // blue-600
   tte: '#6db39f',      // soft sage green
   ttj: '#e5a855',      // warm amber
+  visaSaudi: '#c2410c', // orange-700
   schengen: '#8ecae6', // soft sky blue
   gcc: '#e5c07b',      // soft golden
   ethiopianPP: '#a78bfa', // violet-400
@@ -37,6 +38,7 @@ export default function PnLTable({ data }: PnLTableProps) {
     ttl: 'Travel to Lebanon',
     tte: 'Travel to Egypt',
     ttj: 'Travel to Jordan',
+    visaSaudi: 'Visa Saudi',
     schengen: 'Schengen Countries',
     gcc: 'GCC',
     ethiopianPP: 'Ethiopian Passport Renewal',

@@ -4,6 +4,13 @@ import type { PnLComplaint } from '@/lib/pnl-complaints-types';
 
 interface ComplaintRequest {
   date: string; // YYYY-MM-DD
+  summary?: Array<{
+    COMPLAINT_TYPE?: string;
+    complaint_type?: string;
+    YESTERDAY?: number;
+    THIS_MONTH?: number;
+    LAST_MONTH?: number;
+  }>;
   complaints: Array<{
     contractId?: string;
     CONTRACT_ID?: string;
@@ -47,11 +54,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!body.complaints || !Array.isArray(body.complaints)) {
+    if (!Array.isArray(body.complaints)) {
       return NextResponse.json(
         {
           success: false,
-          error: 'complaints array is required',
+          error: 'complaints must be an array (use [] when sending summary-only)',
         },
         { status: 400 }
       );
@@ -59,8 +66,9 @@ export async function POST(request: NextRequest) {
 
     // Normalize all complaints
     const complaints = body.complaints.map(normalizeComplaint);
+    const summary = 'summary' in body ? body.summary : undefined;
 
-    const result = await storeDailyComplaints(body.date, complaints);
+    const result = await storeDailyComplaints(body.date, complaints, true, summary);
     
     return NextResponse.json(result, {
       status: result.success ? 200 : 400,
