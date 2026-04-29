@@ -1191,8 +1191,15 @@
     }
     function getEvalsDaySummary(doc) {
       if (!doc || typeof doc !== 'object') return null;
-      if (doc.summary && doc.summary.toolEvals && doc.summary.policyEvals) return doc.summary;
-      if (Array.isArray(doc.conversations) && doc.conversations.length > 0) return computeEvalsSummaryFromConversations(doc.conversations);
+      if (doc.success === false) return null;
+      const root =
+        doc.success === true && doc.data != null && typeof doc.data === 'object' && !Array.isArray(doc.data)
+          ? doc.data
+          : doc;
+      if (!root || typeof root !== 'object') return null;
+      if (root.summary && root.summary.toolEvals && root.summary.policyEvals) return root.summary;
+      if (Array.isArray(root.conversations) && root.conversations.length > 0)
+        return computeEvalsSummaryFromConversations(root.conversations);
       return null;
     }
     function evalsMtdSum(mtdSummaries, pick) {
