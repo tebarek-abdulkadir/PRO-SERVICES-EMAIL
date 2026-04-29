@@ -1,9 +1,20 @@
-import { put, list } from '@vercel/blob';
+import { head, list, put } from '@vercel/blob';
 import type { ComplaintsDailySummaryRow } from './complaints-daily-summary';
 import type { PnLComplaint, PnLServiceKey } from './pnl-complaints-types';
 import { getServiceKeyFromComplaintType } from './pnl-complaints-types';
 
 const BLOB_PREFIX = 'complaints-daily/';
+
+/** Drop empty rows (e.g. trailing CSV blanks) so they do not merge under one dedupe key. */
+export function isValidPnLComplaint(c: PnLComplaint): boolean {
+  if (!c.creationDate || !String(c.creationDate).trim()) return false;
+  if (!c.complaintType || !String(c.complaintType).trim()) return false;
+  const hasId =
+    Boolean(c.housemaidId && String(c.housemaidId).trim()) ||
+    Boolean(c.contractId && String(c.contractId).trim()) ||
+    Boolean(c.clientId && String(c.clientId).trim());
+  return hasId;
+}
 
 export interface DailyComplaintsData {
   date: string; // YYYY-MM-DD
@@ -28,6 +39,8 @@ export async function storeDailyComplaints(
   data?: {
     date: string;
     complaintsCount: number;
+    summaryCount?: number;
+    pathname: string;
   };
   error?: string;
 }> {
@@ -40,13 +53,16 @@ export async function storeDailyComplaints(
       };
     }
 
-    const complaintsInput = Array.isArray(complaints) ? complaints : [];
+    const complaintsInput = (Array.isArray(complaints) ? complaints : []).filter(isValidPnLComplaint);
     let existingData: DailyComplaintsData | null = null;
     if (mergeWithExisting) {
       try {
         const existing = await getDailyComplaints(date);
         if (existing.success && existing.data) {
-          existingData = existing.data;
+          existingData = {
+            ...existing.data,
+            complaints: (existing.data.complaints || []).filter(isValidPnLComplaint),
+          };
         }
       } catch {
         console.log(`No existing blob for ${date}`);
@@ -63,29 +79,36 @@ export async function storeDailyComplaints(
       };
     }
 
-    let finalComplaints = complaintsInput;
-    if (mergeWithExisting && existingData) {
-      if (complaintsInput.length === 0) {
-        finalComplaints = existingData.complaints || [];
-      } else if ((existingData.complaints || []).length > 0) {
-        const existingMap = new Map<string, PnLComplaint>();
-        (existingData.complaints || []).forEach((c) => {
-          const key = `${c.contractId}_${c.housemaidId}_${c.clientId}_${c.complaintType}_${c.creationDate}`;
-          existingMap.set(key, c);
-        });
-        complaintsInput.forEach((c) => {
-          const key = `${c.contractId}_${c.housemaidId}_${c.clientId}_${c.complaintType}_${c.creationDate}`;
-          existingMap.set(key, c);
-        });
-        finalComplaints = Array.from(existingMap.values());
-      }
-    }
-
+    let finalComplaints: PnLComplaint[];
     let finalSummary: ComplaintsDailySummaryRow[] | undefined;
-    if (summaryProvided && Array.isArray(summary)) {
-      finalSummary = summary;
-    } else if (mergeWithExisting && existingData?.summary) {
-      finalSummary = existingData.summary;
+
+    if (!mergeWithExisting) {
+      finalComplaints = complaintsInput;
+      finalSummary = summaryProvided && Array.isArray(summary) ? summary : undefined;
+    } else {
+      finalComplaints = complaintsInput;
+      finalSummary = undefined;
+      if (existingData) {
+        if (complaintsInput.length === 0) {
+          finalComplaints = existingData.complaints || [];
+        } else if ((existingData.complaints || []).length > 0) {
+          const existingMap = new Map<string, PnLComplaint>();
+          (existingData.complaints || []).forEach((c) => {
+            const key = `${c.contractId}_${c.housemaidId}_${c.clientId}_${c.complaintType}_${c.creationDate}`;
+            existingMap.set(key, c);
+          });
+          complaintsInput.forEach((c) => {
+            const key = `${c.contractId}_${c.housemaidId}_${c.clientId}_${c.complaintType}_${c.creationDate}`;
+            existingMap.set(key, c);
+          });
+          finalComplaints = Array.from(existingMap.values());
+        }
+      }
+      if (summaryProvided && Array.isArray(summary)) {
+        finalSummary = summary;
+      } else if (existingData?.summary) {
+        finalSummary = existingData.summary;
+      }
     }
 
     const dailyData: DailyComplaintsData = {
@@ -105,6 +128,8 @@ export async function storeDailyComplaints(
       contentType: 'application/json',
       addRandomSuffix: false,
       allowOverwrite: true,
+      /** Min allowed by Vercel Blob; reduces stale CDN reads of public JSON. */
+      cacheControlMaxAge: 120,
     });
 
     console.log(`✅ Stored complaints for ${date}:`, {
@@ -119,6 +144,8 @@ export async function storeDailyComplaints(
       data: {
         date,
         complaintsCount: finalComplaints.length,
+        summaryCount: finalSummary?.length ?? 0,
+        pathname: blobKey,
       },
     };
   } catch (error) {
@@ -141,19 +168,28 @@ export async function getDailyComplaints(date: string): Promise<{
 }> {
   try {
     const blobKey = `${BLOB_PREFIX}${date}.json`;
-    
-    // List blobs to check if it exists
-    const { blobs } = await list({ prefix: blobKey, limit: 1 });
-    
-    if (blobs.length === 0) {
-      return {
-        success: false,
-        error: `No complaints data found for date: ${date}`,
-      };
+
+    let blobUrl: string | undefined;
+    try {
+      const meta = await head(blobKey);
+      blobUrl = meta.url;
+    } catch {
+      const { blobs } = await list({ prefix: blobKey, limit: 50 });
+      const exact = blobs.filter((b) => b.pathname === blobKey);
+      if (exact.length === 0) {
+        return {
+          success: false,
+          error: `No complaints data found for date: ${date}`,
+        };
+      }
+      exact.sort(
+        (a, b) =>
+          new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+      );
+      blobUrl = exact[0].url;
     }
 
-    // Fetch the blob data
-    const response = await fetch(blobs[0].url, { cache: 'no-store' });
+    const response = await fetch(blobUrl, { cache: 'no-store' });
     if (!response.ok) {
       return {
         success: false,

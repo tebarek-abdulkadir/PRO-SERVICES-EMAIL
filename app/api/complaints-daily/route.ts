@@ -40,10 +40,26 @@ function normalizeComplaint(raw: ComplaintRequest['complaints'][0]): PnLComplain
  * POST /api/complaints-daily
  * Store complaints data for a specific date
  */
+function unwrapComplaintsDailyBody(raw: unknown): ComplaintRequest {
+  if (Array.isArray(raw)) {
+    if (raw.length !== 1 || raw[0] == null || typeof raw[0] !== 'object') {
+      throw new Error(
+        'Invalid JSON: expected an object { date, complaints, summary? } or a single-element array wrapping that object'
+      );
+    }
+    return raw[0] as ComplaintRequest;
+  }
+  if (raw == null || typeof raw !== 'object') {
+    throw new Error('Invalid JSON: body must be an object');
+  }
+  return raw as ComplaintRequest;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body: ComplaintRequest = await request.json();
-    
+    const rawBody = await request.json();
+    const body = unwrapComplaintsDailyBody(rawBody);
+
     if (!body.date) {
       return NextResponse.json(
         {
@@ -67,21 +83,28 @@ export async function POST(request: NextRequest) {
     // Normalize all complaints
     const complaints = body.complaints.map(normalizeComplaint);
     const summary = 'summary' in body ? body.summary : undefined;
+    const merge =
+      request.nextUrl.searchParams.get('replace') !== '1' &&
+      request.nextUrl.searchParams.get('merge') !== 'false';
 
-    const result = await storeDailyComplaints(body.date, complaints, true, summary);
+    const result = await storeDailyComplaints(body.date, complaints, merge, summary);
     
     return NextResponse.json(result, {
       status: result.success ? 200 : 400,
     });
   } catch (error) {
     console.error('Error in complaints-daily POST:', error);
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    const isClient =
+      error instanceof Error &&
+      (msg.startsWith('Invalid JSON') || msg.startsWith('Invalid'));
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: msg,
         message: 'Failed to process request',
       },
-      { status: 500 }
+      { status: isClient ? 400 : 500 }
     );
   }
 }
