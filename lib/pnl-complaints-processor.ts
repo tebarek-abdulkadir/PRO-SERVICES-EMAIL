@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { put, list } from '@vercel/blob';
+import { put } from '@vercel/blob';
+import { PUBLIC_JSON_PUT_OPTIONS, resolveBlobReadUrl } from '@/lib/vercel-blob-json';
 import type { 
   PnLComplaint, 
   PnLComplaintSale, 
@@ -268,10 +269,10 @@ export function filterComplaintsByDateRange(
  */
 async function readBlobData(): Promise<PnLComplaintsData | null> {
   try {
-    const { blobs } = await list({ prefix: PNL_COMPLAINTS_BLOB_PATH });
-    if (blobs.length === 0) return null;
-    
-    const response = await fetch(blobs[0].url);
+    const url = await resolveBlobReadUrl(PNL_COMPLAINTS_BLOB_PATH);
+    if (!url) return null;
+
+    const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) return null;
     
     return await response.json();
@@ -284,11 +285,7 @@ async function readBlobData(): Promise<PnLComplaintsData | null> {
 async function writeBlobData(data: PnLComplaintsData): Promise<void> {
   try {
     // Use allowOverwrite to handle concurrent requests without conflicts
-    await put(PNL_COMPLAINTS_BLOB_PATH, JSON.stringify(data, null, 2), {
-      access: 'public',
-      addRandomSuffix: false,
-      allowOverwrite: true,
-    });
+    await put(PNL_COMPLAINTS_BLOB_PATH, JSON.stringify(data, null, 2), PUBLIC_JSON_PUT_OPTIONS);
   } catch (error) {
     console.error('[P&L Complaints] Error writing blob:', error);
     throw error;

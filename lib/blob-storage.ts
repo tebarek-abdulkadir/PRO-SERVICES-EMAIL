@@ -1,4 +1,5 @@
-import { put, list, del, head } from '@vercel/blob';
+import { put, list, del } from '@vercel/blob';
+import { PUBLIC_JSON_PUT_OPTIONS, resolveBlobReadUrl } from '@/lib/vercel-blob-json';
 import type { ProcessedConversation, DailyData, RunStats } from './storage';
 import type { OverseasSalesData, TodoRow } from './todo-types';
 import { processOverseasSales, mergeOverseasSales } from './todo-processor';
@@ -20,28 +21,20 @@ export function isVercelEnvironment(): boolean {
 
 async function readBlob<T>(path: string): Promise<T | null> {
   try {
-    // Try to get blob metadata first to check existence
-    const { blobs } = await list({ 
-      prefix: path,
-      limit: 1,
-    });
-    
-    // Find exact match (not just prefix match)
-    const exactMatch = blobs.find(b => b.pathname === path);
-    if (!exactMatch) return null;
-    
-    // Add cache: 'no-store' to prevent Next.js from caching blob data
-    const response = await fetch(exactMatch.url, {
+    const url = await resolveBlobReadUrl(path);
+    if (!url) return null;
+
+    const response = await fetch(url, {
       cache: 'no-store',
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-      }
+        Pragma: 'no-cache',
+        Expires: '0',
+      },
     });
-    
+
     if (!response.ok) return null;
-    
+
     return await response.json();
   } catch (error) {
     console.error(`[Blob] Error reading ${path}:`, error);
@@ -60,12 +53,7 @@ async function writeBlob<T>(path: string, data: T): Promise<void> {
       },
     };
     
-    // Use allowOverwrite for atomic writes
-    await put(path, JSON.stringify(dataWithMeta, null, 2), {
-      access: 'public',
-      addRandomSuffix: false,
-      allowOverwrite: true,
-    });
+    await put(path, JSON.stringify(dataWithMeta, null, 2), PUBLIC_JSON_PUT_OPTIONS);
     
     console.log(`[Blob] Successfully wrote ${path} at version ${dataWithMeta._blobMeta.version}`);
   } catch (error) {

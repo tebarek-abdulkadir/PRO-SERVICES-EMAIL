@@ -1,4 +1,5 @@
 import { del, head, list, put } from '@vercel/blob';
+import { PUBLIC_JSON_PUT_OPTIONS } from '@/lib/vercel-blob-json';
 import type { ComplaintsDailySummaryRow } from './complaints-daily-summary';
 import type { PnLComplaint, PnLServiceKey } from './pnl-complaints-types';
 import { getServiceKeyFromComplaintType } from './pnl-complaints-types';
@@ -136,14 +137,7 @@ export async function storeDailyComplaints(
         }
       }
     }
-    const blob = await put(blobKey, JSON.stringify(dailyData), {
-      access: 'public',
-      contentType: 'application/json',
-      addRandomSuffix: false,
-      allowOverwrite: true,
-      /** Min allowed by Vercel Blob; reduces stale CDN reads of public JSON. */
-      cacheControlMaxAge: 120,
-    });
+    const blob = await put(blobKey, JSON.stringify(dailyData), PUBLIC_JSON_PUT_OPTIONS);
 
     console.log(`✅ Stored complaints for ${date}:`, {
       totalComplaints: finalComplaints.length,

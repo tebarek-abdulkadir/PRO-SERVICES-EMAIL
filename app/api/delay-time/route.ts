@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
-import { processDelayTimeRecords, processAgentResponseTimeRecords, saveDelayTimeData, getLatestDelayTimeData, dedupeAgentStatsForDay } from '@/lib/chat-storage';
+import {
+  processDelayTimeRecords,
+  processAgentResponseTimeRecords,
+  saveDelayTimeData,
+  getLatestDelayTimeData,
+  getDailyDelayTimeData,
+  dedupeAgentStatsForDay,
+} from '@/lib/chat-storage';
 import type { DelayTimeRequest, DelayTimeResponse } from '@/lib/chat-types';
-import { list } from '@vercel/blob';
 
 /**
  * API Endpoint: /api/delay-time
@@ -134,22 +140,8 @@ export async function GET(request: Request) {
         );
       }
       
-      // Fetch specific date using list + fetch pattern
       try {
-        const { blobs } = await list({
-          prefix: `delay-time/daily/${date}.json`,
-        });
-
-        if (blobs.length === 0) {
-          delayData = null;
-        } else {
-          const response = await fetch(blobs[0].url);
-          if (response.ok) {
-            delayData = await response.json();
-          } else {
-            delayData = null;
-          }
-        }
+        delayData = await getDailyDelayTimeData(date);
       } catch (error) {
         console.error(`Error fetching delay time data for ${date}:`, error);
         delayData = null;

@@ -1,4 +1,5 @@
 import { put, list, del } from '@vercel/blob';
+import { PUBLIC_JSON_PUT_OPTIONS, resolveBlobReadUrl } from '@/lib/vercel-blob-json';
 import type { 
   ChatAnalysisData, 
   ChatAnalysisResult, 
@@ -26,40 +27,12 @@ const DELAY_BLOB_PREFIX = 'delay-time';
  * Save daily chat analysis data to blob storage
  */
 export async function saveDailyChatAnalysisData(data: ChatAnalysisData): Promise<void> {
-  // Save with date-specific filename
   const dateBlobName = `${CHAT_BLOB_PREFIX}/daily/${data.analysisDate}.json`;
-  
-  // Delete existing blob if it exists, then save new one
-  try {
-    const { blobs } = await list({ prefix: dateBlobName });
-    if (blobs.length > 0) {
-      await del(blobs[0].url);
-    }
-  } catch (error) {
-    // Ignore errors if blob doesn't exist
-  }
-  
-  await put(dateBlobName, JSON.stringify(data, null, 2), {
-    access: 'public',
-    contentType: 'application/json',
-  });
-  
-  // Also save as latest for dashboard
+  const body = JSON.stringify(data, null, 2);
+  await put(dateBlobName, body, PUBLIC_JSON_PUT_OPTIONS);
+
   const latestBlobName = `${CHAT_BLOB_PREFIX}/latest.json`;
-  
-  try {
-    const { blobs } = await list({ prefix: latestBlobName });
-    if (blobs.length > 0) {
-      await del(blobs[0].url);
-    }
-  } catch (error) {
-    // Ignore errors if blob doesn't exist
-  }
-  
-  await put(latestBlobName, JSON.stringify(data, null, 2), {
-    access: 'public',
-    contentType: 'application/json',
-  });
+  await put(latestBlobName, body, PUBLIC_JSON_PUT_OPTIONS);
 }
 
 /**
@@ -67,25 +40,17 @@ export async function saveDailyChatAnalysisData(data: ChatAnalysisData): Promise
  */
 export async function getLatestChatAnalysisData(): Promise<ChatAnalysisData | null> {
   try {
-    // List blobs to find the latest.json file
-    const { blobs } = await list({
-      prefix: 'chat-analysis/latest.json',
-    });
-    
-    if (blobs.length === 0) {
+    const url = await resolveBlobReadUrl(`${CHAT_BLOB_PREFIX}/latest.json`);
+    if (!url) {
       console.log('[Chat Storage] No latest chat analysis data found');
       return null;
     }
-    
-    const response = await fetch(blobs[0].url);
-    
+    const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) {
       console.error('[Chat Storage] Failed to fetch latest data:', response.status);
       return null;
     }
-    
-    const data = await response.json();
-    return data as ChatAnalysisData;
+    return (await response.json()) as ChatAnalysisData;
   } catch (error) {
     console.error('[Chat Storage] Error fetching latest chat analysis data:', error);
     return null;
@@ -97,26 +62,17 @@ export async function getLatestChatAnalysisData(): Promise<ChatAnalysisData | nu
  */
 export async function getDailyChatAnalysisData(date: string): Promise<ChatAnalysisData | null> {
   try {
-    // List blobs to find the exact URL
-    const { blobs } = await list({
-      prefix: `chat-analysis/daily/${date}.json`,
-    });
-    
-    if (blobs.length === 0) {
+    const url = await resolveBlobReadUrl(`${CHAT_BLOB_PREFIX}/daily/${date}.json`);
+    if (!url) {
       console.log(`[Chat Storage] No data found for date: ${date}`);
       return null;
     }
-    
-    // Fetch from the blob URL
-    const response = await fetch(blobs[0].url);
-    
+    const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) {
       console.error(`[Chat Storage] Failed to fetch data for ${date}:`, response.status);
       return null;
     }
-    
-    const data = await response.json();
-    return data as ChatAnalysisData;
+    return (await response.json()) as ChatAnalysisData;
   } catch (error) {
     console.error(`[Chat Storage] Error fetching chat analysis data for ${date}:`, error);
     return null;
@@ -1260,40 +1216,12 @@ export function processAgentResponseTimeRecords(
  * Save delay time data to blob storage
  */
 export async function saveDelayTimeData(data: DelayTimeData): Promise<void> {
-  // Save with date-specific filename
   const dateBlobName = `${DELAY_BLOB_PREFIX}/daily/${data.analysisDate}.json`;
-  
-  // Delete existing blob if it exists, then save new one
-  try {
-    const { blobs } = await list({ prefix: dateBlobName });
-    if (blobs.length > 0) {
-      await del(blobs[0].url);
-    }
-  } catch (error) {
-    // Ignore errors if blob doesn't exist
-  }
-  
-  await put(dateBlobName, JSON.stringify(data, null, 2), {
-    access: 'public',
-    contentType: 'application/json',
-  });
-  
-  // Also save as latest for dashboard
+  const body = JSON.stringify(data, null, 2);
+  await put(dateBlobName, body, PUBLIC_JSON_PUT_OPTIONS);
+
   const latestBlobName = `${DELAY_BLOB_PREFIX}/latest.json`;
-  
-  try {
-    const { blobs } = await list({ prefix: latestBlobName });
-    if (blobs.length > 0) {
-      await del(blobs[0].url);
-    }
-  } catch (error) {
-    // Ignore errors if blob doesn't exist
-  }
-  
-  await put(latestBlobName, JSON.stringify(data, null, 2), {
-    access: 'public',
-    contentType: 'application/json',
-  });
+  await put(latestBlobName, body, PUBLIC_JSON_PUT_OPTIONS);
 }
 
 /**
@@ -1301,25 +1229,17 @@ export async function saveDelayTimeData(data: DelayTimeData): Promise<void> {
  */
 export async function getLatestDelayTimeData(): Promise<DelayTimeData | null> {
   try {
-    // List blobs to find the latest.json file
-    const { blobs } = await list({
-      prefix: 'delay-time/latest.json',
-    });
-    
-    if (blobs.length === 0) {
+    const url = await resolveBlobReadUrl(`${DELAY_BLOB_PREFIX}/latest.json`);
+    if (!url) {
       console.log('[Chat Storage] No latest delay time data found');
       return null;
     }
-    
-    const response = await fetch(blobs[0].url);
-    
+    const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) {
       console.error('[Chat Storage] Failed to fetch latest delay time:', response.status);
       return null;
     }
-    
-    const data = await response.json();
-    return data as DelayTimeData;
+    return (await response.json()) as DelayTimeData;
   } catch (error) {
     console.error('[Chat Storage] Error fetching latest delay time data:', error);
     return null;
@@ -1331,25 +1251,17 @@ export async function getLatestDelayTimeData(): Promise<DelayTimeData | null> {
  */
 export async function getDailyDelayTimeData(date: string): Promise<DelayTimeData | null> {
   try {
-    // List blobs to find the exact URL
-    const { blobs } = await list({
-      prefix: `delay-time/daily/${date}.json`,
-    });
-    
-    if (blobs.length === 0) {
+    const url = await resolveBlobReadUrl(`${DELAY_BLOB_PREFIX}/daily/${date}.json`);
+    if (!url) {
       console.log(`[Chat Storage] No delay time data found for date: ${date}`);
       return null;
     }
-    
-    const response = await fetch(blobs[0].url);
-    
+    const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) {
       console.error(`[Chat Storage] Failed to fetch delay time data for ${date}:`, response.status);
       return null;
     }
-    
-    const data = await response.json();
-    return data as DelayTimeData;
+    return (await response.json()) as DelayTimeData;
   } catch (error) {
     console.error(`[Chat Storage] Error fetching delay time data for ${date}:`, error);
     return null;

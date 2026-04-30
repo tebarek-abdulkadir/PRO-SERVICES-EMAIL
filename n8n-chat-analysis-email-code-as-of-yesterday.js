@@ -455,81 +455,109 @@
 
     /** lib/prospects-report.ts computeEmailSalesCcMvSplit */
     function computeEmailSalesCcMvSplit(prospects, complaints, householdMap) {
-      const oecCC = new Set();
-      const oecMV = new Set();
-      const owwaCC = new Set();
-      const owwaMV = new Set();
-      const filCC = new Set();
-      const filMV = new Set();
-      const ethCC = new Set();
-      const ethMV = new Set();
-      const travelSets = {};
+      /**
+       * IMPORTANT:
+       * "Sales out of tracked prospects" must be a subset of total sales.
+       * We enforce this by counting sales as the intersection of:
+       * - contractIds that appear in prospects for a given service row
+       * - contractIds that appear in complaints for that same service row (total sales events)
+       */
       const travelRowKeys = EMAIL_TRAVEL_REGIONS.map((r) => r.key);
-      for (const key of travelRowKeys) {
-        travelSets[key] = { cc: new Set(), mv: new Set() };
-      }
 
-      for (const prospect of prospects) {
-        const matchingComplaints = complaints.filter((complaint) => {
-          return (
-            (prospect.contractId && complaint.contractId === prospect.contractId) ||
-            (prospect.maidId && complaint.housemaidId === prospect.maidId) ||
-            (prospect.clientId && complaint.clientId === prospect.clientId)
-          );
-        });
+      const emptyBuckets = () => ({ cc: new Set(), mv: new Set() });
+      const byRowProspect = new Map();
+      const byRowTotalSales = new Map();
+      const ensure = (m, k) => {
+        if (!m.has(k)) m.set(k, emptyBuckets());
+        return m.get(k);
+      };
 
-        if (matchingComplaints.length === 0) continue;
-
-        const prospectKey = prospect.contractId || prospect.maidId || prospect.clientId;
-        if (!prospectKey) continue;
-
-        const householdKey = prospect.contractId || `standalone_${prospect.maidId || prospect.clientId || 'unknown'}`;
-        const members = householdMap.get(householdKey) || [];
+      // contractId -> CC/MV derived from its household members
+      const contractBucket = new Map();
+      for (const [hk, members] of householdMap) {
         const bucket = householdMembersContractBucket(members);
         if (!bucket) continue;
-
-        const addTo = (ccSet, mvSet) => {
-          if (bucket === 'CC') ccSet.add(prospectKey);
-          else mvSet.add(prospectKey);
-        };
-
-        for (const complaint of matchingComplaints) {
-          if (!complaint.complaintType) continue;
-          const serviceKey = getServiceKeyFromComplaintType(complaint.complaintType);
-
-          if (serviceKey === 'oec' && prospect.isOECProspect) {
-            addTo(oecCC, oecMV);
-          } else if (serviceKey === 'owwa' && prospect.isOWWAProspect) {
-            addTo(owwaCC, owwaMV);
-          } else if (serviceKey && TRAVEL_COMPLAINT_SERVICE_KEYS.has(serviceKey) && prospect.isTravelVisaProspect) {
-            if (
-              serviceKey === 'visaSaudi' &&
-              !prospectCountriesMatchRegions(prospect.travelVisaCountries, ['saudi', 'saudi arabia', 'ksa'])
-            ) {
-              continue;
-            }
-            const region = resolveEmailTravelRegionKey(prospect.travelVisaCountries);
-            const ts = region ? travelSets[region] : undefined;
-            if (ts) addTo(ts.cc, ts.mv);
-          } else if (serviceKey === 'filipinaPP' && prospect.isFilipinaPassportRenewalProspect) {
-            addTo(filCC, filMV);
-          } else if (serviceKey === 'ethiopianPP' && prospect.isEthiopianPassportRenewalProspect) {
-            addTo(ethCC, ethMV);
-          }
+        if (hk && !hk.startsWith('standalone_')) {
+          contractBucket.set(hk, bucket);
         }
       }
 
+      const addContractIdToRow = (rowKey, contractId) => {
+        if (!contractId) return;
+        const bucket = contractBucket.get(contractId);
+        if (bucket !== 'CC' && bucket !== 'MV') return;
+        const tgt = ensure(byRowProspect, rowKey);
+        if (bucket === 'CC') tgt.cc.add(contractId);
+        else tgt.mv.add(contractId);
+      };
+
+      for (const p of prospects) {
+        if (!p || !p.contractId) continue; // subset rule: rely on contractId only
+        if (p.isOECProspect) addContractIdToRow('OEC', p.contractId);
+        if (p.isOWWAProspect) addContractIdToRow('OWWA', p.contractId);
+        if (p.isFilipinaPassportRenewalProspect) addContractIdToRow('Passport Filipina', p.contractId);
+        if (p.isEthiopianPassportRenewalProspect) addContractIdToRow('Passport Ethiopian', p.contractId);
+        if (p.isTravelVisaProspect) {
+          const region = resolveEmailTravelRegionKey(p.travelVisaCountries);
+          if (region) addContractIdToRow(region, p.contractId);
+        }
+      }
+
+      const complaintRowKey = (complaintType) => {
+        const serviceKey = getServiceKeyFromComplaintType(complaintType);
+        if (serviceKey === 'oec') return 'OEC';
+        if (serviceKey === 'owwa') return 'OWWA';
+        if (serviceKey === 'filipinaPP') return 'Passport Filipina';
+        if (serviceKey === 'ethiopianPP') return 'Passport Ethiopian';
+        if (serviceKey && TRAVEL_COMPLAINT_SERVICE_KEYS.has(serviceKey)) {
+          if (serviceKey === 'ttl') return 'Visa Lebanon';
+          if (serviceKey === 'tte') return 'Visa Egypt';
+          if (serviceKey === 'ttj') return 'Visa Jordan';
+          if (serviceKey === 'visaSaudi') return 'Visa Saudi';
+          if (serviceKey === 'schengen') return 'Visa Schengen';
+          return null;
+        }
+        return null;
+      };
+
+      for (const c of complaints || []) {
+        if (!c || !c.complaintType) continue;
+        const rowKey = complaintRowKey(c.complaintType);
+        if (!rowKey) continue;
+        const contractId = c.contractId;
+        if (!contractId) continue; // subset rule: rely on contractId only
+        const bucket = contractBucket.get(contractId);
+        if (bucket !== 'CC' && bucket !== 'MV') continue;
+        const tgt = ensure(byRowTotalSales, rowKey);
+        if (bucket === 'CC') tgt.cc.add(contractId);
+        else tgt.mv.add(contractId);
+      }
+
+      const intersectSize = (a, b) => {
+        if (!a || !b) return 0;
+        let n = 0;
+        for (const x of a) if (b.has(x)) n += 1;
+        return n;
+      };
+      const intersectRow = (rowKey) => {
+        const p = byRowProspect.get(rowKey) || emptyBuckets();
+        const t = byRowTotalSales.get(rowKey) || emptyBuckets();
+        return {
+          cc: intersectSize(p.cc, t.cc),
+          mv: intersectSize(p.mv, t.mv),
+        };
+      };
+
       const travel = {};
       for (const key of travelRowKeys) {
-        const s = travelSets[key];
-        travel[key] = { cc: s.cc.size, mv: s.mv.size };
+        travel[key] = intersectRow(key);
       }
 
       return {
-        oec: { cc: oecCC.size, mv: oecMV.size },
-        owwa: { cc: owwaCC.size, mv: owwaMV.size },
-        filipinaPassportRenewal: { cc: filCC.size, mv: filMV.size },
-        ethiopianPassportRenewal: { cc: ethCC.size, mv: ethMV.size },
+        oec: intersectRow('OEC'),
+        owwa: intersectRow('OWWA'),
+        filipinaPassportRenewal: intersectRow('Passport Filipina'),
+        ethiopianPassportRenewal: intersectRow('Passport Ethiopian'),
         travel,
       };
     }

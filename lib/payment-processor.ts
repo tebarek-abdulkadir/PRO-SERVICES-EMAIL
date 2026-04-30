@@ -1,5 +1,6 @@
 import { RawPayment, ProcessedPayment, PaymentData, mapPaymentTypeToService, normalizePaymentStatus, parsePaymentAmount } from './payment-types';
-import { put, list } from '@vercel/blob';
+import { put } from '@vercel/blob';
+import { PUBLIC_JSON_PUT_OPTIONS, resolveBlobReadUrl } from '@/lib/vercel-blob-json';
 
 /**
  * Processes raw payment data and deduplicates
@@ -55,25 +56,8 @@ export async function savePaymentData(payments: ProcessedPayment[]): Promise<voi
   };
   
   const filename = 'payments-data.json';
-  
-  try {
-    // Try to delete existing file first
-    const { blobs } = await list({ prefix: filename });
-    if (blobs.length > 0) {
-      const { del } = await import('@vercel/blob');
-      await del(blobs[0].url);
-      console.log(`Deleted existing blob: ${filename}`);
-    }
-  } catch (error) {
-    console.log(`No existing blob to delete or error deleting: ${filename}`, error);
-  }
-  
-  // Now put the new data
-  await put(filename, JSON.stringify(paymentData, null, 2), {
-    access: 'public',
-    contentType: 'application/json',
-  });
-  
+  await put(filename, JSON.stringify(paymentData, null, 2), PUBLIC_JSON_PUT_OPTIONS);
+
   console.log(`Saved payment data: ${payments.length} payments (${paymentData.receivedPayments} received)`);
 }
 
@@ -82,15 +66,13 @@ export async function savePaymentData(payments: ProcessedPayment[]): Promise<voi
  */
 export async function getPaymentData(): Promise<PaymentData | null> {
   try {
-    const { blobs } = await list({ prefix: 'payments-data.json' });
-    
-    if (blobs.length === 0) {
+    const url = await resolveBlobReadUrl('payments-data.json');
+    if (!url) {
       console.log('No payment data found in blob storage');
       return null;
     }
-    
-    // Fetch the blob content
-    const response = await fetch(blobs[0].url);
+
+    const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) {
       console.error(`Failed to fetch payment data: ${response.statusText}`);
       return null;

@@ -1,4 +1,5 @@
 import { put, list } from '@vercel/blob';
+import { PUBLIC_JSON_PUT_OPTIONS } from '@/lib/vercel-blob-json';
 import { parse } from 'date-fns';
 import type { NPSRawData, NPSDayData } from './nps-types';
 
@@ -79,12 +80,7 @@ export async function storeNPSData(npsData: NPSRawData): Promise<{
       } else {
         // Store in blob storage
         const blobKey = `${NPS_BLOB_PREFIX}${isoDate}.json`;
-        await put(blobKey, JSON.stringify(dayData, null, 2), {
-          access: 'public',
-          contentType: 'application/json',
-          addRandomSuffix: false,
-          allowOverwrite: true,
-        });
+        await put(blobKey, JSON.stringify(dayData, null, 2), PUBLIC_JSON_PUT_OPTIONS);
         storedDates.push(isoDate);
       }
     }

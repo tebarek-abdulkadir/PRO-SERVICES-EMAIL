@@ -1,4 +1,5 @@
 import { put, list } from '@vercel/blob';
+import { PUBLIC_JSON_PUT_OPTIONS, resolveBlobReadUrl } from '@/lib/vercel-blob-json';
 import type { AgentHoursData, AgentHoursRequest, AgentHoursRecord } from './chat-types';
 
 const BLOB_PREFIX = 'agent-hours/';
@@ -56,10 +57,7 @@ export async function storeAgentHours(request: AgentHoursRequest): Promise<{
 
     // Store in blob with date-based key
     const blobKey = `${BLOB_PREFIX}${analysisDate}.json`;
-    const blob = await put(blobKey, JSON.stringify(agentHoursData), {
-      access: 'public',
-      contentType: 'application/json',
-    });
+    const blob = await put(blobKey, JSON.stringify(agentHoursData), PUBLIC_JSON_PUT_OPTIONS);
 
     console.log(`✅ Stored agent hours data for ${analysisDate}:`, {
       totalAgents,
@@ -97,19 +95,15 @@ export async function getAgentHours(date: string): Promise<{
 }> {
   try {
     const blobKey = `${BLOB_PREFIX}${date}.json`;
-    
-    // List blobs to check if it exists
-    const { blobs } = await list({ prefix: blobKey, limit: 1 });
-    
-    if (blobs.length === 0) {
+    const blobUrl = await resolveBlobReadUrl(blobKey);
+    if (!blobUrl) {
       return {
         success: false,
         error: `No agent hours data found for date: ${date}`,
       };
     }
 
-    // Fetch the blob data
-    const response = await fetch(blobs[0].url);
+    const response = await fetch(blobUrl, { cache: 'no-store' });
     if (!response.ok) {
       return {
         success: false,

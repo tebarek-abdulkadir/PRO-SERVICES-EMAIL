@@ -6,7 +6,8 @@
 
 import fs from 'fs';
 import path from 'path';
-import { put, list } from '@vercel/blob';
+import { put } from '@vercel/blob';
+import { PUBLIC_JSON_PUT_OPTIONS, resolveBlobReadUrl } from '@/lib/vercel-blob-json';
 
 const COST_LOG_FILE = path.join(process.cwd(), 'data', 'cost-log.json');
 const COST_LOG_BLOB_PATH = 'cost-log.json';
@@ -104,10 +105,10 @@ function createEmptySummary(): CostSummary {
 
 async function readBlobData(): Promise<CostSummary> {
   try {
-    const { blobs } = await list({ prefix: COST_LOG_BLOB_PATH });
-    if (blobs.length === 0) return createEmptySummary();
-    
-    const response = await fetch(blobs[0].url);
+    const url = await resolveBlobReadUrl(COST_LOG_BLOB_PATH);
+    if (!url) return createEmptySummary();
+
+    const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) return createEmptySummary();
     
     const data = await response.json();
@@ -124,11 +125,7 @@ async function readBlobData(): Promise<CostSummary> {
 
 async function writeBlobData(data: CostSummary): Promise<void> {
   try {
-    await put(COST_LOG_BLOB_PATH, JSON.stringify(data, null, 2), {
-      access: 'public',
-      addRandomSuffix: false,
-      allowOverwrite: true,
-    });
+    await put(COST_LOG_BLOB_PATH, JSON.stringify(data, null, 2), PUBLIC_JSON_PUT_OPTIONS);
   } catch (error) {
     console.error('[Cost Tracker] Error writing blob:', error);
     throw error;
