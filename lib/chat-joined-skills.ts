@@ -1,8 +1,8 @@
 /**
  * Bot vs agent classification from joinedSkills (comma-separated, contains match, case-insensitive).
  */
-const BOT_TOKENS = ['GPT_VBC_SALES', 'VBC_ROUTING_BOT'] as const;
-const AGENT_TOKENS = ['VBC_SALES_AGENTS', 'VBC_RESOLVERS_AGENTS'] as const;
+const BOT_TOKENS = ['GPT_VBC_SALES', 'GPT_PRO_SERVICES', 'VBC_ROUTING_BOT'] as const;
+const AGENT_TOKENS = ['VBC_SALES_AGENTS', 'PRO_SERVICES_AGENTS', 'VBC_RESOLVERS_AGENTS'] as const;
 
 function normalizeJoinedSkills(s: string | undefined): string {
   return (s ?? '').toUpperCase();

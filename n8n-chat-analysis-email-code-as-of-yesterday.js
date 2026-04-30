@@ -32,8 +32,8 @@
     /** How far back to fetch complaint JSON files (each day one GET) for “complaints before date” filtering. */
     const COMPLAINT_BLOB_LOOKBACK_DAYS = 120;
 
-    const BOT_TOKENS = ['GPT_VBC_SALES', 'VBC_ROUTING_BOT'];
-    const AGENT_TOKENS = ['VBC_SALES_AGENTS', 'VBC_RESOLVERS_AGENTS'];
+    const BOT_TOKENS = ['GPT_VBC_SALES', 'GPT_PRO_SERVICES', 'VBC_ROUTING_BOT'];
+    const AGENT_TOKENS = ['VBC_SALES_AGENTS', 'PRO_SERVICES_AGENTS', 'VBC_RESOLVERS_AGENTS'];
 
     const font = 'Segoe UI,Calibri,sans-serif';
     const thStyle = `padding:8px 10px;background:#4472c4;color:#fff;font-size:11px;font-weight:600;text-align:center;border:1px solid #bdc3c7;font-family:${font}`;
