@@ -5,6 +5,22 @@ import { attachEvalsSummaryIfMissing, computeEvalsSummary } from '@/lib/evals-su
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+/** n8n often sends `[{ analysisDate, conversations, ... }]`; accept same shape as complaints-daily. */
+function unwrapEvalsPostBody(raw: unknown): Record<string, unknown> {
+  if (Array.isArray(raw)) {
+    if (raw.length !== 1 || raw[0] == null || typeof raw[0] !== 'object' || Array.isArray(raw[0])) {
+      throw new Error(
+        'Invalid JSON: expected an object or a single-element array wrapping { analysisDate|evalDate, conversations?, ... }'
+      );
+    }
+    return raw[0] as Record<string, unknown>;
+  }
+  if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error('Body must be a JSON object');
+  }
+  return raw as Record<string, unknown>;
+}
+
 function verifyApiKey(request: Request): boolean {
   const validKey = process.env.INGEST_API_KEY;
   if (!validKey) {
@@ -20,7 +36,8 @@ function verifyApiKey(request: Request): boolean {
 /**
  * POST /api/evals — store arbitrary JSON for a day (n8n / automation).
  *
- * Body: any JSON object. Optional top-level fields:
+ * Body: a JSON object, or a single-element array wrapping that object (n8n item lists).
+ * Optional top-level fields:
  *   - evalDate or analysisDate: YYYY-MM-DD (defaults to UTC calendar day of request)
  *
  * Stored document always includes:
@@ -42,19 +59,16 @@ export async function POST(request: Request) {
 
     let body: Record<string, unknown>;
     try {
-      body = (await request.json()) as Record<string, unknown>;
-    } catch {
-      return NextResponse.json(
-        { success: false, message: 'Invalid request', error: 'Body must be JSON' },
-        { status: 400 }
-      );
-    }
-
-    if (body === null || typeof body !== 'object' || Array.isArray(body)) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid request', error: 'Body must be a JSON object' },
-        { status: 400 }
-      );
+      const raw = await request.json();
+      body = unwrapEvalsPostBody(raw);
+    } catch (e) {
+      const msg =
+        e instanceof SyntaxError
+          ? 'Body must be valid JSON'
+          : e instanceof Error
+            ? e.message
+            : 'Invalid request body';
+      return NextResponse.json({ success: false, message: 'Invalid request', error: msg }, { status: 400 });
     }
 
     const rawDate = body.evalDate ?? body.analysisDate;
@@ -87,10 +101,16 @@ export async function POST(request: Request) {
 
     await saveDailyEvalsData(doc);
 
+    const convCount = Array.isArray(doc.conversations) ? doc.conversations.length : 0;
     return NextResponse.json({
       success: true,
       message: 'Evals data saved successfully',
-      data: { evalDate, blobPath: `evals/daily/${evalDate}.json` },
+      data: {
+        evalDate,
+        blobPath: `evals/daily/${evalDate}.json`,
+        conversationsStored: convCount,
+        summaryComputed: Boolean(doc.summary),
+      },
     });
   } catch (error) {
     console.error('[Evals API] POST error:', error);
